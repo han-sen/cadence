@@ -1,0 +1,59 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import type { ChartEvent } from "@/lib/lineage/events";
+import { streamChart } from "@/lib/lineage/stream-chart";
+import { takeToken } from "@/lib/rate-limit";
+
+const Body = z.object({
+  artist: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1).max(200),
+});
+
+// POST { artist, title } → newline-delimited JSON stream of ChartEvents.
+export async function POST(request: Request) {
+  const body = Body.safeParse(await request.json().catch(() => null));
+  if (!body.success) {
+    return Response.json({ error: "Send an artist and an album title." }, { status: 400 });
+  }
+
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "local";
+  const limit = takeToken(ip);
+  if (!limit.ok) {
+    return Response.json(
+      { error: "You've hit the hourly limit for new charts. Try again later." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const emit = (event: ChartEvent) => {
+        if (!request.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      };
+      try {
+        await streamChart(body.data.artist, body.data.title, { emit, signal: request.signal });
+      } catch (err) {
+        if (!request.signal.aborted) emit({ type: "error", message: errorMessage(err) });
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // Already closed because the client went away.
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Anthropic.RateLimitError) return "The model is busy right now. Try again in a minute.";
+  if (err instanceof Anthropic.AuthenticationError) return "The server's API key isn't configured correctly.";
+  if (err instanceof Anthropic.APIError) return `The model request failed (${err.status}).`;
+  if (err instanceof Error) return err.message;
+  return "Something went wrong.";
+}
