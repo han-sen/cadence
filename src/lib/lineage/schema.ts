@@ -45,6 +45,23 @@ export const LineageChart = z.object({
   albums: z.array(AlbumPick),
 });
 
+// Result of checking an album against MusicBrainz (see musicbrainz.ts).
+export const Verification = z.discriminatedUnion("found", [
+  z.object({
+    found: z.literal(true),
+    mbid: z.string(),
+    artist: z.string(),
+    title: z.string(),
+    year: z.number().int().nullable(),
+    coverUrl: z.string(),
+    // exact: titles match after normalizing. close: one title contains the other,
+    // e.g. "Urban Hang Suite" vs "Maxwell's Urban Hang Suite".
+    match: z.enum(["exact", "close"]),
+  }),
+  z.object({ found: z.literal(false), reason: z.string() }),
+]);
+
 export type LineageChart = z.infer<typeof LineageChart>;
 export type AlbumPick = z.infer<typeof AlbumPick>;
 export type Genre = z.infer<typeof Genre>;
+export type Verification = z.infer<typeof Verification>;

@@ -1,3 +1,5 @@
+import type { Verification } from "./schema";
+
 // MusicBrainz asks for an identifying User-Agent and at most 1 request per second.
 // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
 const USER_AGENT = `Lineage/0.1 ( ${process.env.MB_CONTACT ?? "lineage-app"} )`;
@@ -28,19 +30,9 @@ async function fetchWithRetry(url: string): Promise<Response> {
   }
 }
 
-export type Verification =
-  | {
-      found: true;
-      mbid: string;
-      artist: string;
-      title: string;
-      year: number | null;
-      coverUrl: string;
-      // exact: titles match after normalizing. close: one title contains the other,
-      // e.g. "Urban Hang Suite" vs "Maxwell's Urban Hang Suite".
-      match: "exact" | "close";
-    }
-  | { found: false; reason: string };
+// The result type lives in schema.ts so the browser can validate it without importing this
+// server-only module.
+export type { Verification } from "./schema";
 
 // Lowercase, drop accents, dots and apostrophes ("C.L." → "cl", "Maxwell's" → "maxwells"),
 // "&" → "and", a leading "the", and any other punctuation.

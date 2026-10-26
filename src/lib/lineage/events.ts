@@ -1,12 +1,21 @@
-import type { Verification } from "./musicbrainz";
-import type { AlbumPick, Genre, LineageChart } from "./schema";
+import { z } from "zod";
+import { AlbumPick, Genre, LineageChart, Verification } from "./schema";
 
 // The chart endpoint streams these as newline-delimited JSON, in roughly this order:
 // seed → genre… → album… (each album followed later by its "verified") → done.
-export type ChartEvent =
-  | { type: "seed"; seed: LineageChart["seed"] }
-  | { type: "genre"; genre: Genre }
-  | { type: "album"; id: number; album: AlbumPick }
-  | { type: "verified"; id: number; check: Verification }
-  | { type: "done"; usage: { inputTokens: number; outputTokens: number }; model: string }
-  | { type: "error"; message: string };
+// The server builds events against this schema and the client validates every line with it,
+// so both sides enforce the same contract.
+export const ChartEvent = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("seed"), seed: LineageChart.shape.seed }),
+  z.object({ type: z.literal("genre"), genre: Genre }),
+  z.object({ type: z.literal("album"), id: z.number().int(), album: AlbumPick }),
+  z.object({ type: z.literal("verified"), id: z.number().int(), check: Verification }),
+  z.object({
+    type: z.literal("done"),
+    model: z.string(),
+    usage: z.object({ inputTokens: z.number(), outputTokens: z.number() }),
+  }),
+  z.object({ type: z.literal("error"), message: z.string() }),
+]);
+
+export type ChartEvent = z.infer<typeof ChartEvent>;

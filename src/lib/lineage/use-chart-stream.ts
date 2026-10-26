@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useReducer, useRef } from "react";
-import type { ChartEvent } from "./events";
-import type { Verification } from "./musicbrainz";
-import type { AlbumPick, Genre, LineageChart } from "./schema";
+import { z } from "zod";
+import { ChartEvent } from "./events";
+import type { AlbumPick, Genre, LineageChart, Verification } from "./schema";
 
 export type AlbumEntry = { id: number; album: AlbumPick; check?: Verification };
 
@@ -58,6 +58,24 @@ function reducer(state: ChartState, action: Action): ChartState {
   }
 }
 
+// Checks a line against the shared event schema. A malformed event is skipped rather than
+// ending the stream, so one bad album can't throw away the rest of the chart.
+function parseEvent(line: string): ChartEvent | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(line);
+  } catch {
+    console.warn("Ignoring a stream line that isn't JSON:", line);
+    return null;
+  }
+  const result = ChartEvent.safeParse(json);
+  if (!result.success) {
+    console.warn("Ignoring a malformed chart event:", z.prettifyError(result.error), json);
+    return null;
+  }
+  return result.data;
+}
+
 // Posts to /api/chart and folds the newline-delimited event stream into chart state.
 export function useChartStream() {
   const [state, dispatch] = useReducer(reducer, initial);
@@ -94,7 +112,8 @@ export function useChartStream() {
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line.trim()) continue;
-          const event = JSON.parse(line) as ChartEvent;
+          const event = parseEvent(line);
+          if (!event) continue;
           if (event.type === "done" || event.type === "error") finished = true;
           dispatch({ type: "event", event });
         }
