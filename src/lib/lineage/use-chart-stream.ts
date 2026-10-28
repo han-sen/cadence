@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import { z } from "zod";
 import { ChartEvent } from "./events";
 import type { AlbumPick, Genre, LineageChart, Verification } from "./schema";
@@ -20,16 +20,17 @@ export type ChartState = {
   model?: string;
 };
 
+// Each action carries the time it happened, so the reducer stays pure: same input, same output.
 type Action =
-  | { type: "start" }
-  | { type: "event"; event: ChartEvent }
-  | { type: "fail"; message: string }
-  | { type: "cancel" };
+  | { type: "start"; at: number }
+  | { type: "event"; event: ChartEvent; at: number }
+  | { type: "fail"; message: string; at: number }
+  | { type: "cancel"; at: number };
 
 const initial: ChartState = { status: "idle", genres: [], albums: [] };
 
 function reducer(state: ChartState, action: Action): ChartState {
-  const now = Date.now();
+  const now = action.at;
   switch (action.type) {
     case "start":
       return { ...initial, status: "streaming", startedAt: now };
@@ -81,11 +82,14 @@ export function useChartStream() {
   const [state, dispatch] = useReducer(reducer, initial);
   const controllerRef = useRef<AbortController | null>(null);
 
+  // If the component goes away mid-stream, stop the request so the server stops calling Claude.
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
   const start = useCallback(async (artist: string, title: string) => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    dispatch({ type: "start" });
+    dispatch({ type: "start", at: Date.now() });
 
     try {
       const res = await fetch("/api/chart", {
@@ -96,13 +100,21 @@ export function useChartStream() {
       });
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => null);
-        dispatch({ type: "fail", message: body?.error ?? `Request failed (${res.status}).` });
+        dispatch({ type: "fail", message: body?.error ?? `Request failed (${res.status}).`, at: Date.now() });
         return;
       }
 
+      let finished = false;
+      const handleLine = (line: string) => {
+        if (!line.trim()) return;
+        const event = parseEvent(line);
+        if (!event) return;
+        if (event.type === "done" || event.type === "error") finished = true;
+        dispatch({ type: "event", event, at: Date.now() });
+      };
+
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";
-      let finished = false;
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -110,24 +122,20 @@ export function useChartStream() {
         // Events are one JSON object per line; keep any trailing partial line for the next chunk.
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const event = parseEvent(line);
-          if (!event) continue;
-          if (event.type === "done" || event.type === "error") finished = true;
-          dispatch({ type: "event", event });
-        }
+        lines.forEach(handleLine);
       }
-      if (!finished) dispatch({ type: "fail", message: "The stream ended before the chart finished." });
+      handleLine(buffer); // the last line, in case the stream didn't end with a newline
+
+      if (!finished) dispatch({ type: "fail", message: "The stream ended before the chart finished.", at: Date.now() });
     } catch (err) {
       if (controller.signal.aborted) return;
-      dispatch({ type: "fail", message: err instanceof Error ? err.message : "Connection lost." });
+      dispatch({ type: "fail", message: err instanceof Error ? err.message : "Connection lost.", at: Date.now() });
     }
   }, []);
 
   const cancel = useCallback(() => {
     controllerRef.current?.abort();
-    dispatch({ type: "cancel" });
+    dispatch({ type: "cancel", at: Date.now() });
   }, []);
 
   return { state, start, cancel };
