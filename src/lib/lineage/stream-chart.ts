@@ -10,6 +10,9 @@ const client = new Anthropic();
 
 type Options = { emit: (event: ChartEvent) => void; signal: AbortSignal };
 
+// A failure whose message is written for the user. Any other error is treated as internal.
+export class ChartError extends Error {}
+
 // Streams Claude's structured output and turns it into chart events as soon as each
 // piece is complete, while checking every album against MusicBrainz in the background.
 export async function streamChart(artist: string, title: string, { emit, signal }: Options) {
@@ -78,8 +81,8 @@ export async function streamChart(artist: string, title: string, { emit, signal 
   }
 
   const final = await stream.finalMessage();
-  if (final.stop_reason === "refusal") throw new Error("The model declined this request.");
-  if (final.stop_reason === "max_tokens") throw new Error("The chart was cut off before it finished.");
+  if (final.stop_reason === "refusal") throw new ChartError("The model declined this request.");
+  if (final.stop_reason === "max_tokens") throw new ChartError("The chart was cut off before it finished.");
 
   sendCompleted(JSON.parse(text), true);
   await verifications;

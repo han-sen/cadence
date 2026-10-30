@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { ChartEvent } from "@/lib/lineage/events";
-import { streamChart } from "@/lib/lineage/stream-chart";
+import { ChartError, streamChart } from "@/lib/lineage/stream-chart";
 import { takeToken } from "@/lib/rate-limit";
 
 const Body = z.object({
@@ -34,7 +34,10 @@ export async function POST(request: Request) {
       try {
         await streamChart(body.data.artist, body.data.title, { emit, signal: request.signal });
       } catch (err) {
-        if (!request.signal.aborted) emit({ type: "error", message: errorMessage(err) });
+        if (!request.signal.aborted) {
+          console.error(`Chart failed for "${body.data.title}" by ${body.data.artist}:`, err);
+          emit({ type: "error", message: errorMessage(err) });
+        }
       } finally {
         try {
           controller.close();
@@ -50,10 +53,12 @@ export async function POST(request: Request) {
   });
 }
 
+// Turns an error into text for the user. Unexpected errors get a generic message so internal
+// details never reach the browser; the full error is in the server log.
 function errorMessage(err: unknown): string {
+  if (err instanceof ChartError) return err.message;
   if (err instanceof Anthropic.RateLimitError) return "The model is busy right now. Try again in a minute.";
   if (err instanceof Anthropic.AuthenticationError) return "The server's API key isn't configured correctly.";
   if (err instanceof Anthropic.APIError) return `The model request failed (${err.status}).`;
-  if (err instanceof Error) return err.message;
-  return "Something went wrong.";
+  return "Something went wrong while making this chart.";
 }
