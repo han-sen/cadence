@@ -62,14 +62,15 @@ const compact = (s: string) => s.replace(/ /g, "");
 const containsWords = (longer: string, shorter: string) =>
   shorter.length >= 4 && ` ${longer} `.includes(` ${shorter} `);
 
-// Matches "Space Ape"/"Spaceape", and a leader inside a group name either way round:
-// "Horace Silver" / "The Horace Silver Quintet", "Dinosaur Jr." / "Dinosaur".
-function artistsMatch(wanted: string, creditedNames: string[]): boolean {
+// exact: same name, ignoring spacing ("Space Ape"/"Spaceape").
+// loose: a leader inside a group name either way round: "Horace Silver" / "The Horace Silver
+// Quintet", "Dinosaur Jr." / "Dinosaur".
+function artistMatch(wanted: string, creditedNames: string[]): "exact" | "loose" | null {
   const want = artistParts(wanted);
   const have = creditedNames.flatMap(artistParts);
-  return want.some((w) =>
-    have.some((h) => compact(w) === compact(h) || containsWords(h, w) || containsWords(w, h)),
-  );
+  if (want.some((w) => have.some((h) => compact(w) === compact(h)))) return "exact";
+  if (want.some((w) => have.some((h) => containsWords(h, w) || containsWords(w, h)))) return "loose";
+  return null;
 }
 
 const ROMAN: Record<string, string> = { i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10" };
@@ -116,6 +117,8 @@ type ReleaseGroup = {
   title: string;
   score: number;
   "first-release-date"?: string;
+  "primary-type"?: string; // Album, EP, Single, Broadcast, Other
+  "secondary-types"?: string[]; // Compilation, Live, Soundtrack, …
   "artist-credit"?: {
     name: string;
     joinphrase?: string;
@@ -151,7 +154,31 @@ async function search(query: string, limit: number): Promise<ReleaseGroup[]> {
 const EDITION_SUFFIX =
   /\s*(\(|\[|-\s)[^)\]]*\b(deluxe|remaster(ed)?|expanded|anniversary|edition|bonus)\b[^)\]]*[)\]]?\s*$/i;
 
-export async function verifyAlbum(artist: string, rawTitle: string): Promise<Verification> {
+// A song or broadcast that shares the album's name doesn't confirm the album: "Archangel"
+// is a Burial single, not an album. Compilations and live albums still count, since many
+// are classic records (jazz live sets, for example).
+const NOT_AN_ALBUM = new Set(["Single", "Broadcast"]);
+
+// Results are kept for the life of the server process. Storing the promise rather than the
+// result means two charts asking for the same album at once share one lookup.
+const CACHE_LIMIT = 5000;
+const cache = new Map<string, Promise<Verification>>();
+
+export function verifyAlbum(artist: string, rawTitle: string): Promise<Verification> {
+  const key = `${normalize(artist)}|${titleKey(rawTitle.replace(EDITION_SUFFIX, ""))}`;
+  const cached = cache.get(key);
+  if (cached) return cached;
+
+  const result = lookupAlbum(artist, rawTitle).catch((err): Verification => {
+    cache.delete(key); // don't remember failures; MusicBrainz may be reachable next time
+    return { found: false, reason: (err as Error).message };
+  });
+  cache.set(key, result);
+  if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!); // Maps keep insertion order, so this drops the oldest
+  return result;
+}
+
+async function lookupAlbum(artist: string, rawTitle: string): Promise<Verification> {
   const title = rawTitle.replace(EDITION_SUFFIX, "").trim();
   const [, firstArtist = normalize(artist)] = artistParts(artist);
   const t = escapeLucene(title);
@@ -163,41 +190,49 @@ export async function verifyAlbum(artist: string, rawTitle: string): Promise<Ver
     [`${t} AND artist:(${escapeLucene(firstArtist)})`, 15], // title worded differently
   ];
 
+  // Network and HTTP errors are thrown, so verifyAlbum can tell them apart from "not found".
   let closest: ReleaseGroup | undefined;
-  try {
-    for (const [query, limit] of queries) {
-      const candidates = await search(query, limit);
-      closest ??= candidates[0];
+  let notAnAlbum: ReleaseGroup | undefined;
+  for (const [query, limit] of queries) {
+    const candidates = await search(query, limit);
+    closest ??= candidates[0];
 
-      let best: { rg: ReleaseGroup; match: "exact" | "close" } | undefined;
-      for (const rg of candidates) {
-        if (!artistsMatch(artist, creditNames(rg))) continue;
-        const match = titleMatch(title, rg.title);
-        if (match === "exact") {
-          best = { rg, match };
-          break;
-        }
-        if (match === "close") best ??= { rg, match };
+    let best: { rg: ReleaseGroup; match: "exact" | "close" } | undefined;
+    for (const rg of candidates) {
+      const artistFit = artistMatch(artist, creditNames(rg));
+      const match = titleMatch(title, rg.title);
+      // At most one side may be fuzzy. Both together let "Burial" + "Archangel" match
+      // "Burial Hex" + "Archangel Invocation".
+      if (!artistFit || !match || (artistFit === "loose" && match === "close")) continue;
+      if (NOT_AN_ALBUM.has(rg["primary-type"] ?? "")) {
+        notAnAlbum ??= rg;
+        continue;
       }
-
-      if (best) {
-        const { rg, match } = best;
-        const date = rg["first-release-date"];
-        return {
-          found: true,
-          mbid: rg.id,
-          artist: creditedAs(rg),
-          title: rg.title,
-          year: date ? Number(date.slice(0, 4)) : null,
-          coverUrl: `https://coverartarchive.org/release-group/${rg.id}/front-250`,
-          match,
-        };
+      if (match === "exact") {
+        best = { rg, match };
+        break;
       }
+      best ??= { rg, match };
     }
-  } catch (err) {
-    return { found: false, reason: (err as Error).message };
+
+    if (best) {
+      const { rg, match } = best;
+      const date = rg["first-release-date"];
+      return {
+        found: true,
+        mbid: rg.id,
+        artist: creditedAs(rg),
+        title: rg.title,
+        year: date ? Number(date.slice(0, 4)) : null,
+        coverUrl: `https://coverartarchive.org/release-group/${rg.id}/front-250`,
+        match,
+      };
+    }
   }
 
+  if (notAnAlbum) {
+    return { found: false, reason: `only a ${notAnAlbum["primary-type"]?.toLowerCase()} named "${notAnAlbum.title}"` };
+  }
   return {
     found: false,
     reason: closest ? `closest: "${closest.title}" (score ${closest.score})` : "no results",

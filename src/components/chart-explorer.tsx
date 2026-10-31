@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import type { Genre } from "@/lib/lineage/schema";
+import type { AlbumPick, Genre, Verification } from "@/lib/lineage/schema";
 import { type AlbumEntry, type ChartState, useChartStream } from "@/lib/lineage/use-chart-stream";
 
 // First working version: a plain list view of the streamed chart. The timeline
@@ -75,7 +75,7 @@ export function ChartExplorer() {
         );
       })}
 
-      {state.albums.some((a) => a.album.kindred) && (
+      {state.albums.some((a) => a.album.kindred && !isRejected(a)) && (
         <section aria-label="Kindred" className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Kindred · same feel, different path</h2>
           <AlbumList albums={state.albums.filter((a) => a.album.kindred)} />
@@ -101,18 +101,26 @@ function LabeledInput(props: { label: string; value: string; onChange: (v: strin
   );
 }
 
+// The match details for an album MusicBrainz confirmed. Extract picks the union member
+// whose `found` is true.
+type Confirmed = Extract<Verification, { found: true }>;
+
+// Checked and not found: the album may not exist, so it's never shown.
+const isRejected = (a: AlbumEntry) => a.check !== undefined && !a.check.found;
+
 function StatusLine({ state }: { state: ChartState }) {
-  const checked = state.albums.filter((a) => a.check).length;
-  const found = state.albums.filter((a) => a.check?.found).length;
+  const confirmed = state.albums.filter((a) => a.check?.found).length;
+  const hidden = state.albums.filter(isRejected).length;
   const seconds = (to?: number) => (state.startedAt && to ? ((to - state.startedAt) / 1000).toFixed(1) : null);
 
   let text: string | null = null;
   if (state.status === "streaming") {
     text = state.firstEventAt
-      ? `Mapping… ${state.genres.length} genres, ${state.albums.length} albums so far, ${checked} checked`
+      ? `Mapping… ${state.genres.length} genres, ${confirmed} albums confirmed so far`
       : "Thinking about where this record comes from…";
   } else if (state.status === "done") {
-    text = `Done in ${seconds(state.finishedAt)}s (first result after ${seconds(state.firstEventAt)}s). ${found}/${state.albums.length} albums confirmed on MusicBrainz.`;
+    text = `Done in ${seconds(state.finishedAt)}s (first result after ${seconds(state.firstEventAt)}s). ${confirmed} albums confirmed on MusicBrainz`;
+    text += hidden ? `; ${hidden} couldn't be confirmed and ${hidden === 1 ? "was" : "were"} left out.` : ".";
   } else if (state.status === "cancelled") {
     text = "Cancelled.";
   }
@@ -131,38 +139,104 @@ function GenreSection({ genre, allGenres, albums }: { genre: Genre; allGenres: G
         {genre.name} <span className="font-normal text-zinc-500">· c. {genre.emergedYear}</span>
         {parents.length > 0 && <span className="block text-sm font-normal text-zinc-500">from {parents.join(" + ")}</span>}
       </h3>
-      {albums.length ? <AlbumList albums={albums} /> : <p className="text-sm text-zinc-400">Picking albums…</p>}
+      {!albums.length ? (
+        <p className="text-sm text-zinc-400">Picking albums…</p>
+      ) : albums.every(isRejected) ? (
+        <p className="text-sm text-zinc-400">No confirmed albums for this genre.</p>
+      ) : (
+        <AlbumList albums={albums} />
+      )}
     </div>
   );
 }
 
+// Only confirmed albums are shown. While MusicBrainz is still checking one, a placeholder
+// holds its spot; if the check fails, the album is left out.
 function AlbumList({ albums }: { albums: AlbumEntry[] }) {
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="flex flex-col gap-4">
       {albums.map(({ id, album, check }) => {
-        const missing = check && !check.found;
-        return (
-          <li key={id} className={`flex gap-3 ${missing ? "opacity-40" : ""}`}>
-            <CheckBadge check={check} />
-            <div className="flex flex-col gap-1">
-              <p className="text-sm">
-                <span className="font-medium">{album.title}</span> · {album.artist}, {check?.found && check.match === "exact" && check.year ? check.year : album.year}
-                {missing && <span className="text-zinc-500"> · couldn&apos;t confirm this album exists</span>}
-              </p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{album.why}</p>
-              <TraitList traits={album.sharedTraits} />
-            </div>
-          </li>
-        );
+        if (!check) return <AlbumPlaceholder key={id} />;
+        if (!check.found) return null;
+        return <AlbumRow key={id} album={album} check={check} />;
       })}
     </ul>
   );
 }
 
-function CheckBadge({ check }: { check?: AlbumEntry["check"] }) {
-  if (!check) return <span title="Checking MusicBrainz…" aria-label="Checking" className="mt-1 size-3 shrink-0 animate-pulse rounded-full bg-zinc-300 dark:bg-zinc-700" />;
-  if (check.found) return <span title="Confirmed on MusicBrainz" aria-label="Confirmed" className="mt-1 size-3 shrink-0 rounded-full bg-emerald-500" />;
-  return <span title={check.reason} aria-label="Not found" className="mt-1 size-3 shrink-0 rounded-full border border-zinc-400" />;
+function AlbumRow({ album, check }: { album: AlbumPick; check: Confirmed }) {
+  // A close match can be a reissue or a differently named edition, so its year may be wrong.
+  const year = check.match === "exact" && check.year ? check.year : album.year;
+  return (
+    <li className="flex gap-3">
+      <Cover url={check.coverUrl} />
+      <div className="flex flex-col gap-1">
+        <p className="text-sm">
+          <span className="font-medium">{album.title}</span> · {album.artist}, {year}
+        </p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">{album.why}</p>
+        <TraitList traits={album.sharedTraits} />
+      </div>
+    </li>
+  );
+}
+
+const COVER_CLASS = "size-16 shrink-0 rounded bg-zinc-200 dark:bg-zinc-800";
+
+// Covers come from the Cover Art Archive via two redirects into archive.org, so they can take a
+// few seconds and occasionally fail. Pulses while loading, retries once, and shows a distinct
+// "no cover" square if it still fails (or the archive has no art for this album).
+// alt="" because the title and artist are right next to it; a screen reader would only repeat them.
+function Cover({ url }: { url: string }) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "missing">("loading");
+  const [attempt, setAttempt] = useState(0);
+
+  const onError = () => {
+    if (attempt === 0) {
+      setTimeout(() => setAttempt(1), 2000);
+      return;
+    }
+    console.warn("Cover art failed to load:", url);
+    setStatus("missing");
+  };
+
+  if (status === "missing") {
+    return (
+      <div aria-hidden className={`${COVER_CLASS} grid place-items-center text-lg text-zinc-400 dark:text-zinc-600`}>
+        ♪
+      </div>
+    );
+  }
+  return (
+    <div className={`${COVER_CLASS} overflow-hidden ${status === "loading" ? "animate-pulse" : ""}`}>
+      {/* Plain <img>: small thumbnails from an external archive, so Next's image optimizer
+          would add a server round trip for little gain. The query string on a retry stops the
+          browser from reusing the failed response. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        key={attempt}
+        src={attempt ? `${url}?retry=${attempt}` : url}
+        alt=""
+        width={64}
+        height={64}
+        onLoad={() => setStatus("loaded")}
+        onError={onError}
+        className={`size-full object-cover transition-opacity duration-300 ${status === "loaded" ? "opacity-100" : "opacity-0"}`}
+      />
+    </div>
+  );
+}
+
+function AlbumPlaceholder() {
+  return (
+    <li aria-hidden className="flex animate-pulse gap-3">
+      <div className={COVER_CLASS} />
+      <div className="flex flex-1 flex-col gap-2 pt-1">
+        <div className="h-3 w-1/2 rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-3 w-5/6 rounded bg-zinc-200 dark:bg-zinc-800" />
+      </div>
+    </li>
+  );
 }
 
 function TraitList({ traits }: { traits: string[] }) {
