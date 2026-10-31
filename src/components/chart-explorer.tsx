@@ -1,21 +1,19 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
-import type { AlbumPick, Genre, Verification } from "@/lib/lineage/schema";
+import { useState } from "react";
+import type { AlbumPick, AlbumSuggestion, Genre, Verification } from "@/lib/lineage/schema";
 import { type AlbumEntry, type ChartState, useChartStream } from "@/lib/lineage/use-chart-stream";
+import { AlbumSearch } from "./album-search";
+import { Cover, CoverPlaceholder } from "./cover";
 
 // First working version: a plain list view of the streamed chart. The timeline
 // (React Flow) replaces the genre sections later; the stream and state stay the same.
 export function ChartExplorer() {
   const { state, start, cancel } = useChartStream();
-  const [artist, setArtist] = useState("Burial");
-  const [title, setTitle] = useState("Untrue");
+  // The album picked in the search box. Shown straight away, so there's something on screen
+  // during the ~20s before Claude's first result.
+  const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
   const streaming = state.status === "streaming";
-
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (artist.trim() && title.trim()) start(artist.trim(), title.trim());
-  };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
@@ -26,39 +24,34 @@ export function ChartExplorer() {
         </p>
       </header>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row">
-        <LabeledInput label="Artist" value={artist} onChange={setArtist} disabled={streaming} />
-        <LabeledInput label="Album" value={title} onChange={setTitle} disabled={streaming} />
-        <div className="flex items-end">
-          {streaming ? (
-            // key + preventDefault: React would otherwise reuse this <button> as the submit
-            // button below, and the click would submit the form right after cancelling.
-            <button
-              key="cancel"
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                cancel();
-              }}
-              className="h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <AlbumSearch
+          isDisabled={streaming}
+          onSelect={(album) => {
+            setPicked(album);
+            start(album.artist, album.title);
+          }}
+        />
+        {streaming && (
+          <div className="flex items-start sm:pt-6">
+            <button type="button" onClick={cancel} className="h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700">
               Cancel
             </button>
-          ) : (
-            <button key="submit" type="submit" className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
-              Map it
-            </button>
-          )}
-        </div>
-      </form>
+          </div>
+        )}
+      </div>
 
       <StatusLine state={state} />
 
-      {state.seed && (
-        <section aria-label="Seed album" className="flex flex-col gap-2">
-          <h2 className="text-xl font-semibold">
-            {state.seed.title} <span className="font-normal text-zinc-500">· {state.seed.artist}, {state.seed.year}</span>
-          </h2>
-          <TraitList traits={state.seed.traits} />
+      {picked && state.status !== "idle" && (
+        <section aria-label="Seed album" className="flex gap-4">
+          <Cover key={picked.mbid} url={picked.coverUrl} className="size-24" />
+          <div className="flex flex-col gap-2">
+            <h2 className="text-xl font-semibold">
+              {picked.title} <span className="font-normal text-zinc-500">· {picked.artist}{picked.year ? `, ${picked.year}` : ""}</span>
+            </h2>
+            {state.seed ? <TraitList traits={state.seed.traits} /> : <p className="text-sm text-zinc-400">Listening closely…</p>}
+          </div>
         </section>
       )}
 
@@ -86,20 +79,6 @@ export function ChartExplorer() {
 }
 
 const ROLE_LABEL = { roots: "Roots", seed: "Where it sits", branches: "Branches" } as const;
-
-function LabeledInput(props: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
-  return (
-    <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
-      {props.label}
-      <input
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        disabled={props.disabled}
-        className="h-10 rounded-md border border-zinc-300 bg-transparent px-3 font-normal disabled:opacity-60 dark:border-zinc-700"
-      />
-    </label>
-  );
-}
 
 // The match details for an album MusicBrainz confirmed. Extract picks the union member
 // whose `found` is true.
@@ -169,7 +148,7 @@ function AlbumRow({ album, check }: { album: AlbumPick; check: Confirmed }) {
   const year = check.match === "exact" && check.year ? check.year : album.year;
   return (
     <li className="flex gap-3">
-      <Cover url={check.coverUrl} />
+      <Cover url={check.coverUrl} className="size-16" />
       <div className="flex flex-col gap-1">
         <p className="text-sm">
           <span className="font-medium">{album.title}</span> · {album.artist}, {year}
@@ -181,56 +160,10 @@ function AlbumRow({ album, check }: { album: AlbumPick; check: Confirmed }) {
   );
 }
 
-const COVER_CLASS = "size-16 shrink-0 rounded bg-zinc-200 dark:bg-zinc-800";
-
-// Covers come from the Cover Art Archive via two redirects into archive.org, so they can take a
-// few seconds and occasionally fail. Pulses while loading, retries once, and shows a distinct
-// "no cover" square if it still fails (or the archive has no art for this album).
-// alt="" because the title and artist are right next to it; a screen reader would only repeat them.
-function Cover({ url }: { url: string }) {
-  const [status, setStatus] = useState<"loading" | "loaded" | "missing">("loading");
-  const [attempt, setAttempt] = useState(0);
-
-  const onError = () => {
-    if (attempt === 0) {
-      setTimeout(() => setAttempt(1), 2000);
-      return;
-    }
-    console.warn("Cover art failed to load:", url);
-    setStatus("missing");
-  };
-
-  if (status === "missing") {
-    return (
-      <div aria-hidden className={`${COVER_CLASS} grid place-items-center text-lg text-zinc-400 dark:text-zinc-600`}>
-        ♪
-      </div>
-    );
-  }
-  return (
-    <div className={`${COVER_CLASS} overflow-hidden ${status === "loading" ? "animate-pulse" : ""}`}>
-      {/* Plain <img>: small thumbnails from an external archive, so Next's image optimizer
-          would add a server round trip for little gain. The query string on a retry stops the
-          browser from reusing the failed response. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={attempt}
-        src={attempt ? `${url}?retry=${attempt}` : url}
-        alt=""
-        width={64}
-        height={64}
-        onLoad={() => setStatus("loaded")}
-        onError={onError}
-        className={`size-full object-cover transition-opacity duration-300 ${status === "loaded" ? "opacity-100" : "opacity-0"}`}
-      />
-    </div>
-  );
-}
-
 function AlbumPlaceholder() {
   return (
     <li aria-hidden className="flex animate-pulse gap-3">
-      <div className={COVER_CLASS} />
+      <CoverPlaceholder className="size-16" />
       <div className="flex flex-1 flex-col gap-2 pt-1">
         <div className="h-3 w-1/2 rounded bg-zinc-200 dark:bg-zinc-800" />
         <div className="h-3 w-5/6 rounded bg-zinc-200 dark:bg-zinc-800" />

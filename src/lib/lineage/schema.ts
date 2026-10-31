@@ -61,7 +61,19 @@ export const Verification = z.discriminatedUnion("found", [
   z.object({ found: z.literal(false), reason: z.string() }),
 ]);
 
+// One album in the seed search dropdown (GET /api/search).
+export const AlbumSuggestion = z.object({
+  mbid: z.string(),
+  artist: z.string(),
+  title: z.string(),
+  year: z.number().int().nullable(),
+  type: z.string(), // "Album" or "EP"
+  coverUrl: z.string(),
+});
+export const SearchResponse = z.object({ results: z.array(AlbumSuggestion) });
+
 export type LineageChart = z.infer<typeof LineageChart>;
+export type AlbumSuggestion = z.infer<typeof AlbumSuggestion>;
 export type AlbumPick = z.infer<typeof AlbumPick>;
 export type Genre = z.infer<typeof Genre>;
 export type Verification = z.infer<typeof Verification>;

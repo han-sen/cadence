@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { ChartEvent } from "@/lib/lineage/events";
 import { ChartError, streamChart } from "@/lib/lineage/stream-chart";
-import { takeToken } from "@/lib/rate-limit";
+import { clientKey, takeChartToken } from "@/lib/rate-limit";
 
 const Body = z.object({
   artist: z.string().trim().min(1).max(200),
@@ -16,8 +16,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Send an artist and an album title." }, { status: 400 });
   }
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "local";
-  const limit = takeToken(ip);
+  const limit = takeChartToken(clientKey(request));
   if (!limit.ok) {
     return Response.json(
       { error: "You've hit the hourly limit for new charts. Try again later." },

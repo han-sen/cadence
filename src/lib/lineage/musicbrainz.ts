@@ -1,4 +1,4 @@
-import type { Verification } from "./schema";
+import type { AlbumSuggestion, Verification } from "./schema";
 
 // MusicBrainz asks for an identifying User-Agent and at most 1 request per second.
 // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
@@ -6,25 +6,55 @@ const USER_AGENT = `Lineage/0.1 ( ${process.env.MB_CONTACT ?? "lineage-app"} )`;
 const MIN_INTERVAL_MS = 1100;
 const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000];
 
-let lastRequestAt = 0;
-
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function throttledFetch(url: string): Promise<Response> {
-  const wait = lastRequestAt + MIN_INTERVAL_MS - Date.now();
-  if (wait > 0) await sleep(wait);
-  lastRequestAt = Date.now();
-  return fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" } });
+// "now": someone is waiting on it (search as you type). "background": album checks.
+type Priority = "now" | "background";
+type Job = { signal?: AbortSignal; send: () => void; drop: () => void };
+
+// Every MusicBrainz request in the server goes through this one queue, one request per slot.
+// "now" jobs go ahead of background ones, and a search the user has already typed past is
+// dropped without using a slot.
+const queues: Record<Priority, Job[]> = { now: [], background: [] };
+let nextSlotAt = 0;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+function throttledFetch(url: string, priority: Priority, signal?: AbortSignal): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    queues[priority].push({
+      signal,
+      send: () =>
+        fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal }).then(resolve, reject),
+      drop: () => reject(signal?.reason),
+    });
+    runQueue();
+  });
 }
 
-// 503 means "slow down": back off and retry. Network errors get the same treatment.
-async function fetchWithRetry(url: string): Promise<Response> {
+function runQueue() {
+  if (timer || (!queues.now.length && !queues.background.length)) return;
+  timer = setTimeout(() => {
+    timer = null;
+    const job = queues.now.shift() ?? queues.background.shift();
+    if (job?.signal?.aborted) {
+      job.drop();
+    } else if (job) {
+      nextSlotAt = Date.now() + MIN_INTERVAL_MS;
+      job.send();
+    }
+    runQueue();
+  }, Math.max(0, nextSlotAt - Date.now()));
+}
+
+// 503 means "slow down": back off and retry. Network errors get the same treatment,
+// except when the caller cancelled.
+async function fetchWithRetry(url: string, priority: Priority, signal?: AbortSignal): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await throttledFetch(url);
+      const res = await throttledFetch(url, priority, signal);
       if (res.status !== 503 || attempt >= RETRY_DELAYS_MS.length) return res;
     } catch (err) {
-      if (attempt >= RETRY_DELAYS_MS.length) throw err;
+      if (signal?.aborted || attempt >= RETRY_DELAYS_MS.length) throw err;
     }
     await sleep(RETRY_DELAYS_MS[attempt]);
   }
@@ -116,6 +146,7 @@ type ReleaseGroup = {
   id: string;
   title: string;
   score: number;
+  count?: number; // how many releases (editions, reissues) the group has
   "first-release-date"?: string;
   "primary-type"?: string; // Album, EP, Single, Broadcast, Other
   "secondary-types"?: string[]; // Compilation, Live, Soundtrack, …
@@ -125,6 +156,12 @@ type ReleaseGroup = {
     artist?: { name: string; "sort-name"?: string };
   }[];
 };
+
+const yearOf = (rg: ReleaseGroup) => {
+  const date = rg["first-release-date"];
+  return date ? Number(date.slice(0, 4)) : null;
+};
+const coverUrlOf = (rg: ReleaseGroup) => `https://coverartarchive.org/release-group/${rg.id}/front-250`;
 
 const creditedAs = (rg: ReleaseGroup) =>
   (rg["artist-credit"] ?? []).map((c) => c.name + (c.joinphrase ?? "")).join("");
@@ -142,9 +179,14 @@ function creditNames(rg: ReleaseGroup): string[] {
   return names;
 }
 
-async function search(query: string, limit: number): Promise<ReleaseGroup[]> {
+async function search(
+  query: string,
+  limit: number,
+  priority: Priority = "background",
+  signal?: AbortSignal,
+): Promise<ReleaseGroup[]> {
   const url = `https://musicbrainz.org/ws/2/release-group?fmt=json&limit=${limit}&query=${encodeURIComponent(query)}`;
-  const res = await fetchWithRetry(url);
+  const res = await fetchWithRetry(url, priority, signal);
   if (!res.ok) throw new Error(`MusicBrainz HTTP ${res.status}`);
   const data = (await res.json()) as { "release-groups"?: ReleaseGroup[] };
   return data["release-groups"] ?? [];
@@ -217,14 +259,13 @@ async function lookupAlbum(artist: string, rawTitle: string): Promise<Verificati
 
     if (best) {
       const { rg, match } = best;
-      const date = rg["first-release-date"];
       return {
         found: true,
         mbid: rg.id,
         artist: creditedAs(rg),
         title: rg.title,
-        year: date ? Number(date.slice(0, 4)) : null,
-        coverUrl: `https://coverartarchive.org/release-group/${rg.id}/front-250`,
+        year: yearOf(rg),
+        coverUrl: coverUrlOf(rg),
         match,
       };
     }
@@ -237,4 +278,52 @@ async function lookupAlbum(artist: string, rawTitle: string): Promise<Verificati
     found: false,
     reason: closest ? `closest: "${closest.title}" (score ${closest.score})` : "no results",
   };
+}
+
+// Search as you type, for picking the seed album.
+//
+// MusicBrainz has no popularity ranking, so "untrue" alone would list a dozen obscure EPs
+// before Burial's album. Release count (how many editions and reissues exist) is a decent
+// stand-in for popularity, so results are re-ranked by text score plus release count.
+const SEARCH_LIMIT = 25;
+const SUGGESTIONS = 8;
+const SEARCH_CACHE_LIMIT = 2000;
+const searchCache = new Map<string, AlbumSuggestion[]>();
+
+export async function searchAlbums(text: string, signal?: AbortSignal): Promise<AlbumSuggestion[]> {
+  // Lowercase also stops typed "AND"/"OR" from being read as search operators.
+  const key = text.toLowerCase().replace(/\s+/g, " ").trim();
+  const cached = searchCache.get(key);
+  if (cached) return cached;
+
+  const words = key.split(" ").filter((w) => /[\p{L}\p{N}]/u.test(w)).map(escapeLucene);
+  if (!words.length) return [];
+
+  // Each word must appear in the title or the artist. The last word may be half typed, so it
+  // also matches as a prefix ("untr" → "untrue"), unless it's a single letter.
+  const wordClauses = words.map((w, i) => {
+    const term = i === words.length - 1 && w.length >= 2 ? `${w}*` : w;
+    return `(releasegroup:${term} OR artist:${term})`;
+  });
+  const query =
+    `(releasegroup:"${escapeLucene(key)}"^4 OR (${wordClauses.join(" AND ")}))` +
+    ` AND (primarytype:album OR primarytype:ep) AND NOT secondarytype:(remix OR compilation)`;
+
+  const groups = await search(query, SEARCH_LIMIT, "now", signal);
+  const rank = (rg: ReleaseGroup) => rg.score + 12 * Math.log2(rg.count ?? 1);
+  const results = groups
+    .sort((a, b) => rank(b) - rank(a))
+    .slice(0, SUGGESTIONS)
+    .map((rg) => ({
+      mbid: rg.id,
+      artist: creditedAs(rg),
+      title: rg.title,
+      year: yearOf(rg),
+      type: rg["primary-type"] ?? "Album",
+      coverUrl: coverUrlOf(rg),
+    }));
+
+  searchCache.set(key, results);
+  if (searchCache.size > SEARCH_CACHE_LIMIT) searchCache.delete(searchCache.keys().next().value!);
+  return results;
 }
