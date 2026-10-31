@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, use, useMemo, useState } from "react";
 import type { AlbumPick, AlbumSuggestion, Genre, Verification } from "@/lib/lineage/schema";
 import { type AlbumEntry, type ChartState, useChartStream } from "@/lib/lineage/use-chart-stream";
 import { AlbumSearch } from "./album-search";
 import { Cover, CoverPlaceholder } from "./cover";
+
+// The trait the user clicked, if any. Shared through context because trait pills and album
+// rows sit several components deep (genre section → album list → row → pills).
+const ActiveTrait = createContext<{ active: string | null; toggle: (trait: string) => void }>({
+  active: null,
+  toggle: () => {},
+});
+
+// Claude copies traits from the seed's list, but compare loosely in case the casing drifts.
+const sameTrait = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const sharesTrait = (album: AlbumPick, trait: string) => album.sharedTraits.some((t) => sameTrait(t, trait));
 
 // First working version: a plain list view of the streamed chart. The timeline
 // (React Flow) replaces the genre sections later; the stream and state stay the same.
@@ -13,68 +24,91 @@ export function ChartExplorer() {
   // The album picked in the search box. Shown straight away, so there's something on screen
   // during the ~20s before Claude's first result.
   const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
+  const [activeTrait, setActiveTrait] = useState<string | null>(null);
   const streaming = state.status === "streaming";
 
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Lineage</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">
-          Name an album you love. See where it came from, where it led, and what to play next.
-        </p>
-      </header>
+  // Clicking the active trait again clears it.
+  const traitContext = useMemo(
+    () => ({ active: activeTrait, toggle: (t: string) => setActiveTrait((cur) => (cur && sameTrait(cur, t) ? null : t)) }),
+    [activeTrait],
+  );
+  const matching = activeTrait
+    ? state.albums.filter((a) => a.check?.found && sharesTrait(a.album, activeTrait)).length
+    : 0;
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <AlbumSearch
-          isDisabled={streaming}
-          onSelect={(album) => {
-            setPicked(album);
-            start(album.artist, album.title);
-          }}
-        />
-        {streaming && (
-          <div className="flex items-start sm:pt-6">
-            <button type="button" onClick={cancel} className="h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700">
-              Cancel
-            </button>
-          </div>
+  return (
+    <ActiveTrait value={traitContext}>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">Lineage</h1>
+          <p className="text-zinc-600 dark:text-zinc-400">
+            Name an album you love. See where it came from, where it led, and what to play next.
+          </p>
+        </header>
+  
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <AlbumSearch
+            isDisabled={streaming}
+            onSelect={(album) => {
+              setPicked(album);
+              setActiveTrait(null);
+              start(album.artist, album.title);
+            }}
+          />
+          {streaming && (
+            <div className="flex items-start sm:pt-6">
+              <button type="button" onClick={cancel} className="h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700">
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+  
+        <StatusLine state={state} />
+  
+        {picked && state.status !== "idle" && (
+          <section aria-label="Seed album" className="flex gap-4">
+            <Cover key={picked.mbid} url={picked.coverUrl} className="size-24" />
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xl font-semibold">
+                {picked.title} <span className="font-normal text-zinc-500">· {picked.artist}{picked.year ? `, ${picked.year}` : ""}</span>
+              </h2>
+              {state.seed ? <TraitList traits={state.seed.traits} /> : <p className="text-sm text-zinc-400">Listening closely…</p>}
+              <p aria-live="polite" className="text-sm text-zinc-500">
+                {activeTrait && (
+                  <>
+                    {matching} {matching === 1 ? "album shares" : "albums share"} “{activeTrait}” ·{" "}
+                    <button type="button" onClick={() => setActiveTrait(null)} className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100">
+                      Clear
+                    </button>
+                  </>
+                )}
+              </p>
+            </div>
+          </section>
+        )}
+  
+        {(["roots", "seed", "branches"] as const).map((role) => {
+          const genres = state.genres.filter((g) => g.role === role);
+          if (!genres.length) return null;
+          return (
+            <section key={role} aria-label={ROLE_LABEL[role]} className="flex flex-col gap-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">{ROLE_LABEL[role]}</h2>
+              {genres.map((genre) => (
+                <GenreSection key={genre.id} genre={genre} allGenres={state.genres} albums={state.albums.filter((a) => a.album.genreId === genre.id)} />
+              ))}
+            </section>
+          );
+        })}
+  
+        {state.albums.some((a) => a.album.kindred && !isRejected(a)) && (
+          <section aria-label="Kindred" className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Kindred · same feel, different path</h2>
+            <AlbumList albums={state.albums.filter((a) => a.album.kindred)} />
+          </section>
         )}
       </div>
-
-      <StatusLine state={state} />
-
-      {picked && state.status !== "idle" && (
-        <section aria-label="Seed album" className="flex gap-4">
-          <Cover key={picked.mbid} url={picked.coverUrl} className="size-24" />
-          <div className="flex flex-col gap-2">
-            <h2 className="text-xl font-semibold">
-              {picked.title} <span className="font-normal text-zinc-500">· {picked.artist}{picked.year ? `, ${picked.year}` : ""}</span>
-            </h2>
-            {state.seed ? <TraitList traits={state.seed.traits} /> : <p className="text-sm text-zinc-400">Listening closely…</p>}
-          </div>
-        </section>
-      )}
-
-      {(["roots", "seed", "branches"] as const).map((role) => {
-        const genres = state.genres.filter((g) => g.role === role);
-        if (!genres.length) return null;
-        return (
-          <section key={role} aria-label={ROLE_LABEL[role]} className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">{ROLE_LABEL[role]}</h2>
-            {genres.map((genre) => (
-              <GenreSection key={genre.id} genre={genre} allGenres={state.genres} albums={state.albums.filter((a) => a.album.genreId === genre.id)} />
-            ))}
-          </section>
-        );
-      })}
-
-      {state.albums.some((a) => a.album.kindred && !isRejected(a)) && (
-        <section aria-label="Kindred" className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Kindred · same feel, different path</h2>
-          <AlbumList albums={state.albums.filter((a) => a.album.kindred)} />
-        </section>
-      )}
-    </div>
+    </ActiveTrait>
   );
 }
 
@@ -146,8 +180,10 @@ function AlbumList({ albums }: { albums: AlbumEntry[] }) {
 function AlbumRow({ album, check }: { album: AlbumPick; check: Confirmed }) {
   // A close match can be a reissue or a differently named edition, so its year may be wrong.
   const year = check.match === "exact" && check.year ? check.year : album.year;
+  const { active } = use(ActiveTrait);
+  const dimmed = active !== null && !sharesTrait(album, active);
   return (
-    <li className="flex gap-3">
+    <li className={`flex gap-3 transition-opacity duration-200 ${dimmed ? "opacity-30" : ""}`}>
       <Cover url={check.coverUrl} className="size-16" />
       <div className="flex flex-col gap-1">
         <p className="text-sm">
@@ -172,13 +208,31 @@ function AlbumPlaceholder() {
   );
 }
 
+// Each pill is a toggle button: clicking it fades every album that doesn't share the trait.
 function TraitList({ traits }: { traits: string[] }) {
+  const { active, toggle } = use(ActiveTrait);
   if (!traits.length) return null;
   return (
     <ul className="flex flex-wrap gap-1.5">
-      {traits.map((t) => (
-        <li key={t} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{t}</li>
-      ))}
+      {traits.map((t) => {
+        const pressed = active !== null && sameTrait(active, t);
+        return (
+          <li key={t}>
+            <button
+              type="button"
+              aria-pressed={pressed}
+              onClick={() => toggle(t)}
+              className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
+                pressed
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              }`}
+            >
+              {t}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
