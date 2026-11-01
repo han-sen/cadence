@@ -13,7 +13,7 @@ Structure (the lineage):
 
 Content (the recommendations):
 - For each genre, pick 3 albums a fan of the seed album would enjoy, chosen for shared sound, mood or feel, not historical importance alone. Mix one well-known record with deeper cuts.
-- Add 3 "kindred" albums (kindred: true, genreId: null): records from any era that share the seed's traits but aren't on the genre path.
+- Add 3 "kindred" albums (kindred: true, genreId: null): records from any era that share the seed's traits but aren't on the genre path. These are the main recommendations, so list them FIRST in the albums array, before any genre albums.
 - Avoid the seed artist, and use each artist at most once.
 - seed.traits: 4-6 short, concrete traits describing the seed's sound, mood or scene. Each album's sharedTraits must come from that list.
 - "why" speaks to the listener ("If you love the X on this record..."), never claims the album influenced the seed.

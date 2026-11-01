@@ -87,7 +87,15 @@ export function ChartExplorer() {
             </div>
           </section>
         )}
-  
+
+        {/* Kindred picks come first: they're the "listen to this next" recommendations. */}
+        {state.albums.some((a) => a.album.kindred && !isRejected(a)) && (
+          <section aria-label="Kindred" className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Kindred · same feel, different path</h2>
+            <AlbumList albums={state.albums.filter((a) => a.album.kindred)} />
+          </section>
+        )}
+
         {(["roots", "seed", "branches"] as const).map((role) => {
           const genres = state.genres.filter((g) => g.role === role);
           if (!genres.length) return null;
@@ -100,13 +108,6 @@ export function ChartExplorer() {
             </section>
           );
         })}
-  
-        {state.albums.some((a) => a.album.kindred && !isRejected(a)) && (
-          <section aria-label="Kindred" className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Kindred · same feel, different path</h2>
-            <AlbumList albums={state.albums.filter((a) => a.album.kindred)} />
-          </section>
-        )}
       </div>
     </ActiveTrait>
   );
