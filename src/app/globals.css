@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
+/* One dark theme only (design decision): `dark:` styles always apply, whatever the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #021617;
+  --foreground: #ffffff;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +16,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
 }
 
 body {
-  background: var(--background);
+  /* Test background: the Plumeform footer gradient (teal glow at the top, fading to near-black).
+     Fixed, so it stays put behind the content instead of stretching with page height. */
+  background:
+    radial-gradient(ellipse 500px 300px at 50% 0%, rgb(74 165 147 / .3) 0%, rgb(74 165 147 / .3) 45%, rgb(74 165 147 / 0) 100%),
+    linear-gradient(180deg, #016d65 0%, #01443f 50%, #002e2b 75%, #021617 100%);
+  background-color: var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }

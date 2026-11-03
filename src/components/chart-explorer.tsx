@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, use, useMemo, useState } from "react";
+import { createContext, use, useEffect, useMemo, useState } from "react";
 import type { AlbumPick, AlbumSuggestion, Genre, Verification } from "@/lib/lineage/schema";
 import { type AlbumEntry, type ChartState, useChartStream } from "@/lib/lineage/use-chart-stream";
 import { AlbumSearch } from "./album-search";
 import { Cover, CoverPlaceholder } from "./cover";
+import { SeedLoader, type SeedProgress } from "./seed-loader";
 
 // The trait the user clicked, if any. Shared through context because trait pills and album
 // rows sit several components deep (genre section → album list → row → pills).
@@ -41,7 +42,7 @@ export function ChartExplorer() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold tracking-tight">Lineage</h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
+          <p className="text-white/60">
             Name an album you love. See where it came from, where it led, and what to play next.
           </p>
         </header>
@@ -57,28 +58,27 @@ export function ChartExplorer() {
           />
           {streaming && (
             <div className="flex items-start sm:pt-6">
-              <button type="button" onClick={cancel} className="h-10 rounded-md border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700">
+              <button type="button" onClick={cancel} className="h-10 rounded-md border border-white/15 px-4 text-sm font-medium hover:bg-white/10">
                 Cancel
               </button>
             </div>
           )}
         </div>
   
-        <StatusLine state={state} />
-  
         {picked && state.status !== "idle" && (
           <section aria-label="Seed album" className="flex gap-4">
-            <Cover key={picked.mbid} url={picked.coverUrl} className="size-24" />
+            {/* Keyed by the run, so picking an album again replays the sequence. */}
+            <SeedLoader key={state.startedAt} coverUrl={picked.coverUrl} progress={seedProgress(state)} className="size-32 sm:size-40" />
             <div className="flex flex-col gap-2">
               <h2 className="text-xl font-semibold">
-                {picked.title} <span className="font-normal text-zinc-500">· {picked.artist}{picked.year ? `, ${picked.year}` : ""}</span>
+                {picked.title} <span className="font-normal text-white/60">· {picked.artist}{picked.year ? `, ${picked.year}` : ""}</span>
               </h2>
-              {state.seed ? <TraitList traits={state.seed.traits} /> : <p className="text-sm text-zinc-400">Listening closely…</p>}
-              <p aria-live="polite" className="text-sm text-zinc-500">
+              {state.seed ? <TraitList traits={state.seed.traits} /> : streaming && <ListeningLines />}
+              <p aria-live="polite" className="text-sm text-white/60">
                 {activeTrait && (
                   <>
                     {matching} {matching === 1 ? "album shares" : "albums share"} “{activeTrait}” ·{" "}
-                    <button type="button" onClick={() => setActiveTrait(null)} className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-zinc-100">
+                    <button type="button" onClick={() => setActiveTrait(null)} className="underline underline-offset-2 hover:text-white">
                       Clear
                     </button>
                   </>
@@ -88,10 +88,14 @@ export function ChartExplorer() {
           </section>
         )}
 
+        {/* Below the seed header, so it doesn't push the loading animation down when it appears.
+            Timings are dev info for now; the planned debug panel is their real home. */}
+        <StatusLine state={state} />
+
         {/* Kindred picks come first: they're the "listen to this next" recommendations. */}
         {state.albums.some((a) => a.album.kindred && !isRejected(a)) && (
           <section aria-label="Kindred" className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Kindred · same feel, different path</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-white/60">Kindred · same feel, different path</h2>
             <AlbumList albums={state.albums.filter((a) => a.album.kindred)} />
           </section>
         )}
@@ -101,7 +105,7 @@ export function ChartExplorer() {
           if (!genres.length) return null;
           return (
             <section key={role} aria-label={ROLE_LABEL[role]} className="flex flex-col gap-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">{ROLE_LABEL[role]}</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-white/60">{ROLE_LABEL[role]}</h2>
               {genres.map((genre) => (
                 <GenreSection key={genre.id} genre={genre} allGenres={state.genres} albums={state.albums.filter((a) => a.album.genreId === genre.id)} />
               ))}
@@ -129,9 +133,8 @@ function StatusLine({ state }: { state: ChartState }) {
 
   let text: string | null = null;
   if (state.status === "streaming") {
-    text = state.firstEventAt
-      ? `Mapping… ${state.genres.length} genres, ${confirmed} albums confirmed so far`
-      : "Thinking about where this record comes from…";
+    // Before the first event, the seed header's own status lines cover the wait.
+    if (state.firstEventAt) text = `Mapping… ${state.genres.length} genres, ${confirmed} albums confirmed so far`;
   } else if (state.status === "done") {
     text = `Done in ${seconds(state.finishedAt)}s (first result after ${seconds(state.firstEventAt)}s). ${confirmed} albums confirmed on MusicBrainz`;
     text += hidden ? `; ${hidden} couldn't be confirmed and ${hidden === 1 ? "was" : "were"} left out.` : ".";
@@ -140,23 +143,54 @@ function StatusLine({ state }: { state: ChartState }) {
   }
 
   if (state.status === "error") {
-    return <p role="alert" className="text-sm text-red-600 dark:text-red-400">{state.error}</p>;
+    return <p role="alert" className="text-sm text-red-300">{state.error}</p>;
   }
-  return text ? <p aria-live="polite" className="text-sm text-zinc-500">{text}</p> : null;
+  return text ? <p aria-live="polite" className="text-sm text-white/60">{text}</p> : null;
+}
+
+// Which real events the seed loader has seen. Its loading state ends at the first confirmed
+// kindred album (the "listen to this next" row is ready), or when the stream stops for any reason.
+function seedProgress(state: ChartState): SeedProgress {
+  const kindred = state.albums.filter((a) => a.album.kindred);
+  return {
+    traitsArrived: state.seed !== undefined,
+    kindredNamed: kindred.length > 0,
+    finished: state.status !== "streaming" || kindred.some((a) => a.check?.found),
+  };
+}
+
+// Staged lines next to the seed cover until the traits replace them. They set the mood only:
+// the halftone carries the real progress. The last line holds however long the wait is.
+const LISTENING = ["Listening closely…", "Picking out its sound…", "Finding what makes it feel the way it does…"];
+const LINE_MS = 3500;
+
+function ListeningLines() {
+  const [line, setLine] = useState(0);
+  useEffect(() => {
+    if (line >= LISTENING.length - 1) return;
+    const t = setTimeout(() => setLine(line + 1), LINE_MS);
+    return () => clearTimeout(t);
+  }, [line]);
+  return (
+    <p aria-live="polite" className="text-sm text-white/60">
+      {/* Keyed so each new line fades in. */}
+      <span key={line} className="animate-[fade-in_.5s_ease-out]">{LISTENING[line]}</span>
+    </p>
+  );
 }
 
 function GenreSection({ genre, allGenres, albums }: { genre: Genre; allGenres: Genre[]; albums: AlbumEntry[] }) {
   const parents = genre.parentIds.map((id) => allGenres.find((g) => g.id === id)?.name).filter(Boolean);
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <div className="flex flex-col gap-3 rounded-lg border border-white/15 p-4">
       <h3 className="font-medium">
-        {genre.name} <span className="font-normal text-zinc-500">· c. {genre.emergedYear}</span>
-        {parents.length > 0 && <span className="block text-sm font-normal text-zinc-500">from {parents.join(" + ")}</span>}
+        {genre.name} <span className="font-normal text-white/60">· c. {genre.emergedYear}</span>
+        {parents.length > 0 && <span className="block text-sm font-normal text-white/60">from {parents.join(" + ")}</span>}
       </h3>
       {!albums.length ? (
-        <p className="text-sm text-zinc-400">Picking albums…</p>
+        <p className="text-sm text-white/45">Picking albums…</p>
       ) : albums.every(isRejected) ? (
-        <p className="text-sm text-zinc-400">No confirmed albums for this genre.</p>
+        <p className="text-sm text-white/45">No confirmed albums for this genre.</p>
       ) : (
         <AlbumList albums={albums} />
       )}
@@ -190,7 +224,7 @@ function AlbumRow({ album, check }: { album: AlbumPick; check: Confirmed }) {
         <p className="text-sm">
           <span className="font-medium">{album.title}</span> · {album.artist}, {year}
         </p>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{album.why}</p>
+        <p className="text-sm text-white/60">{album.why}</p>
         <TraitList traits={album.sharedTraits} />
       </div>
     </li>
@@ -202,8 +236,8 @@ function AlbumPlaceholder() {
     <li aria-hidden className="flex animate-pulse gap-3">
       <CoverPlaceholder className="size-16" />
       <div className="flex flex-1 flex-col gap-2 pt-1">
-        <div className="h-3 w-1/2 rounded bg-zinc-200 dark:bg-zinc-800" />
-        <div className="h-3 w-5/6 rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-3 w-1/2 rounded bg-white/10" />
+        <div className="h-3 w-5/6 rounded bg-white/10" />
       </div>
     </li>
   );
@@ -225,8 +259,8 @@ function TraitList({ traits }: { traits: string[] }) {
               onClick={() => toggle(t)}
               className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
                 pressed
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  ? "bg-white text-zinc-950"
+                  : "bg-white/10 text-white/80 hover:bg-white/20"
               }`}
             >
               {t}

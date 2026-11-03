@@ -64,23 +64,23 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
       <div className="relative">
         <Input
           placeholder="Search by album or artist, e.g. Untrue Burial"
-          className="h-10 w-full rounded-md border border-zinc-300 bg-transparent px-3 pr-24 outline-none focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700"
+          className="h-10 w-full rounded-md border border-white/15 bg-white/5 px-3 pr-24 outline-none placeholder:text-white/45 focus:border-white/40 disabled:opacity-60"
         />
-        {searching && <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-zinc-400">Searching…</span>}
+        {searching && <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-white/45">Searching…</span>}
       </div>
       {list.error && (
-        <Text slot="errorMessage" className="text-sm text-red-600 dark:text-red-400">
+        <Text slot="errorMessage" className="text-sm text-red-300">
           {list.error.message}
         </Text>
       )}
       <Popover
         offset={4}
-        className="w-(--trigger-width) overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+        className="w-(--trigger-width) overflow-auto rounded-md border border-white/15 bg-[#01302c]/85 shadow-lg shadow-black/30 backdrop-blur-xl"
       >
         <ListBox
           className="max-h-96 p-1 outline-none"
           renderEmptyState={() => (
-            <p className="px-2 py-1.5 text-sm text-zinc-500">
+            <p className="px-2 py-1.5 text-sm text-white/60">
               {list.filterText.trim().length < MIN_CHARS
                 ? "Keep typing…"
                 : list.isLoading
@@ -95,14 +95,14 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
             <ListBoxItem
               id={album.mbid}
               textValue={label(album)}
-              className="flex cursor-default items-center gap-3 rounded px-2 py-1.5 outline-none data-focused:bg-zinc-100 dark:data-focused:bg-zinc-800"
+              className="flex cursor-default items-center gap-3 rounded px-2 py-1.5 outline-none data-focused:bg-white/10"
             >
               <Cover url={album.coverUrl} className="size-10" />
               <span className="flex min-w-0 flex-col">
                 <Text slot="label" className="truncate text-sm font-medium">
                   {album.title}
                 </Text>
-                <Text slot="description" className="truncate text-xs text-zinc-500">
+                <Text slot="description" className="truncate text-xs text-white/60">
                   {album.artist}
                   {album.year ? ` · ${album.year}` : ""}
                   {album.type === "EP" ? " · EP" : ""}
