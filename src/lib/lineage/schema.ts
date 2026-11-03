@@ -39,7 +39,9 @@ export const LineageChart = z.object({
     genreIds: z.array(z.string()),
     traits: z
       .array(z.string())
-      .describe("Short sound/mood/scene traits, e.g. 'motorik drums', 'Manchester 1979'"),
+      // No .max(): structured outputs ignore string length limits, so the SDK would check them
+      // after the fact and one long trait would fail the whole chart. The prompt sets the length.
+      .describe("Vivid, tag-length sound/mood/scene traits, 2-4 words each, e.g. 'motorik drums', 'Manchester 1979'"),
   }),
   genres: z.array(Genre),
   albums: z.array(AlbumPick),
