@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #021617;
+  --background: #021117;
   --foreground: #ffffff;
   color-scheme: dark;
 }
@@ -17,17 +17,22 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(2px); }
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+/* Wander for the background's blurred pools. Each pool sets its own --dx, --dy and --s. */
+@keyframes drift {
+  to {
+    transform: translate(var(--dx, 6vw), var(--dy, 4vh)) scale(var(--s, 1.08));
+  }
 }
 
 body {
-  /* Test background: the Plumeform footer gradient (teal glow at the top, fading to near-black).
-     Fixed, so it stays put behind the content instead of stretching with page height. */
-  background:
-    radial-gradient(ellipse 500px 300px at 50% 0%, rgb(74 165 147 / .3) 0%, rgb(74 165 147 / .3) 45%, rgb(74 165 147 / 0) 100%),
-    linear-gradient(180deg, #016d65 0%, #01443f 50%, #002e2b 75%, #021617 100%);
+  /* Base color only; the background design itself is the fixed layer in components/background.tsx. */
   background-color: var(--background);
-  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
