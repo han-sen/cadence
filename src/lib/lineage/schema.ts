@@ -27,7 +27,9 @@ export const AlbumPick = z.object({
   kindred: z
     .boolean()
     .describe("True for contemporaries that share traits but aren't on the genre path"),
-  why: z.string().describe("One or two sentences on why a fan of the seed would like it"),
+  why: z
+    .string()
+    .describe("One or two sentences on why a fan of the seed would like it, naming something concrete you'd hear; vary the opening"),
   sharedTraits: z.array(z.string()).describe("Traits from seed.traits this album shares"),
 });
 

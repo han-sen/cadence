@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AlbumSuggestion } from "@/lib/lineage/schema";
-import { type ChartState, useChartStream } from "@/lib/lineage/use-chart-stream";
+import {
+  type ChartState,
+  useChartStream,
+} from "@/lib/lineage/use-chart-stream";
 import { AlbumCardPlaceholder, AlbumCards, isRejected } from "./album-card";
 import { AlbumSearch } from "./album-search";
 import { LineageFlow, SectionLabel } from "./lineage-flow";
@@ -17,15 +20,21 @@ export function ChartExplorer() {
   // during the ~20s before Claude's first result.
   const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
   const [activeTrait, setActiveTrait] = useState<string | null>(null);
-  const streaming = state.status === "streaming";
+  const isStreaming = state.status === "streaming";
 
   // Clicking the active trait again clears it.
   const traitContext = useMemo(
-    () => ({ active: activeTrait, toggle: (t: string) => setActiveTrait((cur) => (cur && sameTrait(cur, t) ? null : t)) }),
+    () => ({
+      active: activeTrait,
+      toggle: (t: string) =>
+        setActiveTrait((cur) => (cur && sameTrait(cur, t) ? null : t)),
+    }),
     [activeTrait],
   );
   const matching = activeTrait
-    ? state.albums.filter((a) => a.check?.found && sharesTrait(a.album, activeTrait)).length
+    ? state.albums.filter(
+        (a) => a.check?.found && sharesTrait(a.album, activeTrait),
+      ).length
     : 0;
   const kindred = state.albums.filter((a) => a.album.kindred);
 
@@ -35,22 +44,27 @@ export function ChartExplorer() {
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold tracking-tight">Lineage</h1>
           <p className="text-white/60">
-            Name an album you love. See where it came from, where it led, and what to play next.
+            Name an album you love. See where it came from, where it led, and
+            what to play next.
           </p>
         </header>
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <AlbumSearch
-            isDisabled={streaming}
+            isDisabled={isStreaming}
             onSelect={(album) => {
               setPicked(album);
               setActiveTrait(null);
               start(album.artist, album.title);
             }}
           />
-          {streaming && (
+          {isStreaming && (
             <div className="flex items-start sm:pt-6">
-              <button type="button" onClick={cancel} className="h-10 rounded-md border border-white/15 px-4 text-sm font-medium hover:bg-white/10">
+              <button
+                type="button"
+                onClick={cancel}
+                className="h-10 rounded-md border border-white/15 px-4 text-sm font-medium hover:bg-white/10"
+              >
                 Cancel
               </button>
             </div>
@@ -60,51 +74,101 @@ export function ChartExplorer() {
         {picked && state.status !== "idle" && (
           <section aria-label="Seed album" className="flex gap-4 sm:gap-5">
             {/* Keyed by the run, so picking an album again replays the sequence. */}
-            <SeedLoader key={state.startedAt} coverUrl={picked.coverUrl} progress={seedProgress(state)} className="size-28 sm:size-40" />
-            <div className="flex min-w-0 flex-col gap-2">
+            <SeedLoader
+              key={state.startedAt}
+              coverUrl={picked.coverUrl}
+              progress={seedProgress(state)}
+              className="size-28 sm:size-40"
+            />
+            {/* Stretches to the cover's height, so the status line can sit level with its bottom edge. */}
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
               <h2 className="text-xl font-semibold sm:text-2xl">
-                {picked.title} <span className="font-normal text-white/60">· {picked.artist}{picked.year ? `, ${picked.year}` : ""}</span>
+                {picked.title}{" "}
+                <span className="font-normal text-white/60">
+                  · {picked.artist}
+                  {picked.year ? `, ${picked.year}` : ""}
+                </span>
               </h2>
-              {state.seed ? <TraitList traits={state.seed.traits} /> : streaming && <ListeningLines />}
-              <p aria-live="polite" className="text-sm text-white/60">
+
+              {state.seed ? (
+                <TraitList traits={state.seed.traits} />
+              ) : (
+                isStreaming && <ListeningLines />
+              )}
+              {/* Empty most of the time. A negative margin cancels its gap rather than hiding it,
+                  because a hidden live region can miss announcing new text. */}
+              <p
+                aria-live="polite"
+                className="text-sm text-white/60 empty:-mt-2"
+              >
                 {activeTrait && (
                   <>
-                    {matching} {matching === 1 ? "album shares" : "albums share"} “{activeTrait}” ·{" "}
-                    <button type="button" onClick={() => setActiveTrait(null)} className="underline underline-offset-2 hover:text-white">
+                    {matching}{" "}
+                    {matching === 1 ? "album shares" : "albums share"} “
+                    {activeTrait}” ·{" "}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTrait(null)}
+                      className="underline underline-offset-2 hover:text-white"
+                    >
                       Clear
                     </button>
                   </>
                 )}
               </p>
+              {/* Pinned to the bottom of the column, in the space under the tags. The cover sits
+                  in its own column, so this appearing never moves the loading animation.
+                  Timings are dev info for now; the planned debug panel is their real home. */}
+              <div className="mt-auto">
+                <StatusLine state={state} />
+              </div>
             </div>
           </section>
         )}
-
-        {/* Below the seed header, so it doesn't push the loading animation down when it appears.
-            Timings are dev info for now; the planned debug panel is their real home. */}
-        <StatusLine state={state} />
 
         {/* Kindred first: the "listen to this next" picks. They sit off the genre path, so they
             live outside the hourglass rather than in it. */}
         {/* The chart lists every genre before any album, so without reserved space the roots
             would render first and get pushed down when kindred arrives. While streaming, hold
             the section open from the first event with placeholders up to the usual 3 picks. */}
-        {(kindred.some((a) => !isRejected(a)) || (streaming && state.firstEventAt)) && (
+        {(kindred.some((a) => !isRejected(a)) ||
+          (isStreaming && state.firstEventAt)) && (
           <section aria-label="Kindred" className="mt-4">
             <SectionLabel label="Kindred" hint="Same feel, different scene" />
             <ul className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
-              <AlbumCards albums={kindred} coverClass="size-18" placeholderClass={KINDRED_PLACEHOLDER} />
-              {streaming &&
-                Array.from({ length: Math.max(0, KINDRED_COUNT - kindred.filter((a) => !isRejected(a)).length) }, (_, i) => (
-                  <AlbumCardPlaceholder key={`reserved-${i}`} coverClass="size-18" className={KINDRED_PLACEHOLDER} />
-                ))}
+              <AlbumCards
+                albums={kindred}
+                coverClass="size-18"
+                placeholderClass={KINDRED_PLACEHOLDER}
+                isStandalone={true}
+              />
+              {isStreaming &&
+                Array.from(
+                  {
+                    length: Math.max(
+                      0,
+                      KINDRED_COUNT -
+                        kindred.filter((a) => !isRejected(a)).length,
+                    ),
+                  },
+                  (_, i) => (
+                    <AlbumCardPlaceholder
+                      key={`reserved-${i}`}
+                      coverClass="size-18"
+                      className={KINDRED_PLACEHOLDER}
+                    />
+                  ),
+                )}
             </ul>
           </section>
         )}
 
         {state.genres.length > 0 && (
           <div className="mt-6">
-            <LineageFlow genres={state.genres} albums={state.albums.filter((a) => !a.album.kindred)} />
+            <LineageFlow
+              genres={state.genres}
+              albums={state.albums.filter((a) => !a.album.kindred)}
+            />
           </div>
         )}
       </div>
@@ -120,23 +184,35 @@ const KINDRED_PLACEHOLDER = "min-h-45";
 function StatusLine({ state }: { state: ChartState }) {
   const confirmed = state.albums.filter((a) => a.check?.found).length;
   const hidden = state.albums.filter(isRejected).length;
-  const seconds = (to?: number) => (state.startedAt && to ? ((to - state.startedAt) / 1000).toFixed(1) : null);
+  const seconds = (to?: number) =>
+    state.startedAt && to ? ((to - state.startedAt) / 1000).toFixed(1) : null;
 
   let text: string | null = null;
   if (state.status === "streaming") {
     // Before the first event, the seed header's own status lines cover the wait.
-    if (state.firstEventAt) text = `Mapping… ${state.genres.length} genres, ${confirmed} albums confirmed so far`;
+    if (state.firstEventAt)
+      text = `Mapping… ${state.genres.length} genres, ${confirmed} albums confirmed so far`;
   } else if (state.status === "done") {
     text = `Done in ${seconds(state.finishedAt)}s (first result after ${seconds(state.firstEventAt)}s). ${confirmed} albums confirmed on MusicBrainz`;
-    text += hidden ? `; ${hidden} couldn't be confirmed and ${hidden === 1 ? "was" : "were"} left out.` : ".";
+    text += hidden
+      ? `; ${hidden} couldn't be confirmed and ${hidden === 1 ? "was" : "were"} left out.`
+      : ".";
   } else if (state.status === "cancelled") {
     text = "Cancelled.";
   }
 
   if (state.status === "error") {
-    return <p role="alert" className="text-sm text-red-300">{state.error}</p>;
+    return (
+      <p role="alert" className="text-xs font-mono text-red-300">
+        {state.error}
+      </p>
+    );
   }
-  return text ? <p aria-live="polite" className="text-sm text-white/60">{text}</p> : null;
+  return text ? (
+    <p aria-live="polite" className="text-xs font-mono text-white/60">
+      {text}
+    </p>
+  ) : null;
 }
 
 // Which real events the seed loader has seen. Its loading state ends at the first confirmed
@@ -146,13 +222,18 @@ function seedProgress(state: ChartState): SeedProgress {
   return {
     traitsArrived: state.seed !== undefined,
     kindredNamed: kindred.length > 0,
-    finished: state.status !== "streaming" || kindred.some((a) => a.check?.found),
+    finished:
+      state.status !== "streaming" || kindred.some((a) => a.check?.found),
   };
 }
 
 // Staged lines next to the seed cover until the traits replace them. They set the mood only:
 // the halftone carries the real progress. The last line holds however long the wait is.
-const LISTENING = ["Listening closely…", "Picking out its sound…", "Finding what makes it feel the way it does…"];
+const LISTENING = [
+  "Listening closely…",
+  "Analyzing the album's sound…",
+  "Finding what makes it feel the way it does…",
+];
 const LINE_MS = 3500;
 
 function ListeningLines() {
@@ -165,7 +246,9 @@ function ListeningLines() {
   return (
     <p aria-live="polite" className="text-sm text-white/60">
       {/* Keyed so each new line fades in. */}
-      <span key={line} className="animate-[fade-in_.5s_ease-out]">{LISTENING[line]}</span>
+      <span key={line} className="animate-[fade-in_.5s_ease-out]">
+        {LISTENING[line]}
+      </span>
     </p>
   );
 }

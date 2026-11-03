@@ -9,7 +9,10 @@ import type { Genre } from "@/lib/lineage/schema";
 // Hidden on phones, where the cards say "from X + Y" instead.
 export function GenreCables({ genres }: { genres: Genre[] }) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [drawing, setDrawing] = useState<CableDrawing>({ cables: [], sockets: [] });
+  const [drawing, setDrawing] = useState<CableDrawing>({
+    cables: [],
+    sockets: [],
+  });
 
   useEffect(() => {
     const container = svgRef.current?.parentElement;
@@ -17,10 +20,17 @@ export function GenreCables({ genres }: { genres: Genre[] }) {
     const measure = () => {
       const origin = container.getBoundingClientRect();
       const boxes = new Map<string, Box>();
-      container.querySelectorAll<HTMLElement>("[data-genre-id]").forEach((el) => {
-        const r = el.getBoundingClientRect();
-        boxes.set(el.dataset.genreId!, { l: r.left - origin.left, r: r.right - origin.left, t: r.top - origin.top, b: r.bottom - origin.top });
-      });
+      container
+        .querySelectorAll<HTMLElement>("[data-genre-id]")
+        .forEach((el) => {
+          const r = el.getBoundingClientRect();
+          boxes.set(el.dataset.genreId!, {
+            l: r.left - origin.left,
+            r: r.right - origin.left,
+            t: r.top - origin.top,
+            b: r.bottom - origin.top,
+          });
+        });
       setDrawing(cablePaths(genres, boxes));
     };
     // Card sizes change as albums stream in and covers load, and positions shift when a new
@@ -28,18 +38,30 @@ export function GenreCables({ genres }: { genres: Genre[] }) {
     // once straight away, which draws the first frame.
     const observer = new ResizeObserver(measure);
     observer.observe(container);
-    container.querySelectorAll("[data-genre-id]").forEach((el) => observer.observe(el));
+    container
+      .querySelectorAll("[data-genre-id]")
+      .forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, [genres]);
 
   return (
-    <svg ref={svgRef} aria-hidden className="pointer-events-none absolute inset-0 z-10 size-full overflow-visible max-sm:hidden">
-      <g fill="none" stroke="rgb(255 255 255 / .55)" strokeWidth={2.5} strokeLinecap="round">
+    <svg
+      ref={svgRef}
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-10 size-full overflow-visible max-sm:hidden"
+    >
+      <g
+        fill="none"
+        stroke="rgb(255 255 255 / .55)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        opacity={0.5}
+      >
         {drawing.cables.map((d, i) => (
           <path key={i} d={d} />
         ))}
       </g>
-      <g fill="#d9efe9">
+      <g fill="#d9efe9" opacity={0.75}>
         {drawing.sockets.map((s, i) => (
           <circle key={i} cx={s.x} cy={s.y} r={5} />
         ))}

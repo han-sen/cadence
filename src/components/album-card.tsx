@@ -10,22 +10,43 @@ import { TraitList, useDimmed } from "./trait-filter";
 export type Confirmed = Extract<Verification, { found: true }>;
 
 // Checked and not found: the album may not exist, so it's never shown.
-export const isRejected = (a: AlbumEntry) => a.check !== undefined && !a.check.found;
+export const isRejected = (a: AlbumEntry) =>
+  a.check !== undefined && !a.check.found;
 
 // A close match can be a reissue or a differently named edition, so its year may be wrong.
-export const albumYear = (album: AlbumPick, check: Confirmed) => (check.match === "exact" && check.year ? check.year : album.year);
+export const albumYear = (album: AlbumPick, check: Confirmed) =>
+  check.match === "exact" && check.year ? check.year : album.year;
 
 // Full album card: cover, title, "why" and shared traits. The cover floats left so the text
 // wraps underneath it instead of leaving a tall empty column; flow-root keeps the float inside.
 // `coverClass` sets the cover size, e.g. "size-18".
-export function AlbumCard({ album, check, coverClass }: { album: AlbumPick; check: Confirmed; coverClass: string }) {
+export function AlbumCard({
+  album,
+  check,
+  coverClass,
+  isStandalone = false,
+}: {
+  album: AlbumPick;
+  check: Confirmed;
+  coverClass: string;
+  isStandalone: boolean;
+}) {
   const dimmed = useDimmed(album);
   return (
-    <li className={`flow-root transition-opacity duration-200 ${dimmed ? "opacity-30" : ""}`}>
-      <Cover url={check.coverUrl} className={`float-left mt-0.5 mr-3 mb-1.5 ${coverClass}`} />
+    <li
+      className={`flow-root transition-opacity duration-200 shadow-sm ${isStandalone ? "bg-[linear-gradient(45deg,_rgba(255,_255,_255,_0.145),_transparent)] rounded p-4 animate-[fade-in_.5s_ease-out]" : ""} ${dimmed ? "opacity-30" : ""}`}
+    >
+      <Cover
+        url={check.coverUrl}
+        className={`float-left mt-0.5 mr-3 mb-1.5 ${coverClass}`}
+      />
       <p className="text-sm">
         <span className="font-semibold">{album.title}</span>{" "}
-        <span className="text-white/60">· {album.artist}, {albumYear(album, check)}</span>
+        <span className="text-white/60">· {album.artist},</span>
+        <span className="font-mono text-white/60">
+          {" "}
+          {albumYear(album, check)}
+        </span>
       </p>
       <p className="mt-0.5 mb-2 text-[13px] text-white/60">{album.why}</p>
       <TraitList traits={album.sharedTraits} />
@@ -35,7 +56,13 @@ export function AlbumCard({ album, check, coverClass }: { album: AlbumPick; chec
 
 // Holds an album's spot while MusicBrainz checks it.
 // `className` can add a min height where the swap must not move what's below (kindred).
-export function AlbumCardPlaceholder({ coverClass, className = "" }: { coverClass: string; className?: string }) {
+export function AlbumCardPlaceholder({
+  coverClass,
+  className = "",
+}: {
+  coverClass: string;
+  className?: string;
+}) {
   return (
     <li aria-hidden className={`flex animate-pulse gap-3 ${className}`}>
       <CoverPlaceholder className={coverClass} />
@@ -53,10 +80,35 @@ export function AlbumCardPlaceholder({ coverClass, className = "" }: { coverClas
 }
 
 // Only confirmed albums are shown: a placeholder while the check runs, nothing if it fails.
-export function AlbumCards({ albums, coverClass, placeholderClass }: { albums: AlbumEntry[]; coverClass: string; placeholderClass?: string }) {
+export function AlbumCards({
+  albums,
+  coverClass,
+  placeholderClass,
+  isStandalone = false,
+}: {
+  albums: AlbumEntry[];
+  coverClass: string;
+  placeholderClass?: string;
+  isStandalone: boolean;
+}) {
   return albums.map(({ id, album, check }) => {
-    if (!check) return <AlbumCardPlaceholder key={id} coverClass={coverClass} className={placeholderClass} />;
+    if (!check)
+      return (
+        <AlbumCardPlaceholder
+          key={id}
+          coverClass={coverClass}
+          className={placeholderClass}
+        />
+      );
     if (!check.found) return null;
-    return <AlbumCard key={id} album={album} check={check} coverClass={coverClass} />;
+    return (
+      <AlbumCard
+        key={id}
+        album={album}
+        check={check}
+        coverClass={coverClass}
+        isStandalone={isStandalone}
+      />
+    );
   });
 }
