@@ -6,14 +6,15 @@ import {
   type ChartState,
   useChartStream,
 } from "@/lib/lineage/use-chart-stream";
-import { AlbumCardPlaceholder, AlbumCards, isRejected } from "./album-card";
+import { AlbumCards, isRejected } from "./album-card";
 import { AlbumSearch } from "./album-search";
 import { LineageFlow, SectionLabel } from "./lineage-flow";
 import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
 
-// The chart page: search, the seed header, kindred picks, then the lineage as an hourglass
-// (roots → nearest neighbors → branches). Everything fills in as the stream arrives.
+// The chart page: search, the seed header, the lineage as an hourglass (roots → nearest
+// neighbors → branches), then kindred picks from other genres. Everything fills in as the
+// stream arrives.
 export function ChartExplorer() {
   const { state, start, cancel } = useChartStream();
   // The album picked in the search box. Shown straight away, so there's something on screen
@@ -82,13 +83,18 @@ export function ChartExplorer() {
             />
             {/* Stretches to the cover's height, so the status line can sit level with its bottom edge. */}
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <h2 className="text-xl font-semibold sm:text-2xl">
-                {picked.title}{" "}
+              <h2 className="text-3xl font-semibold sm:text-2xl">
+                {picked.title}
+              </h2>
+              <p>
+                {" "}
                 <span className="font-normal text-white/60">
-                  · {picked.artist}
+                  {picked.artist}
+                </span>
+                <span className="font-mono text-white/40">
                   {picked.year ? `, ${picked.year}` : ""}
                 </span>
-              </h2>
+              </p>
 
               {state.seed ? (
                 <TraitList traits={state.seed.traits} />
@@ -116,50 +122,7 @@ export function ChartExplorer() {
                   </>
                 )}
               </p>
-              {/* Pinned to the bottom of the column, in the space under the tags. The cover sits
-                  in its own column, so this appearing never moves the loading animation.
-                  Timings are dev info for now; the planned debug panel is their real home. */}
-              <div className="mt-auto">
-                <StatusLine state={state} />
-              </div>
             </div>
-          </section>
-        )}
-
-        {/* Kindred first: the "listen to this next" picks. They sit off the genre path, so they
-            live outside the hourglass rather than in it. */}
-        {/* The chart lists every genre before any album, so without reserved space the roots
-            would render first and get pushed down when kindred arrives. While streaming, hold
-            the section open from the first event with placeholders up to the usual 3 picks. */}
-        {(kindred.some((a) => !isRejected(a)) ||
-          (isStreaming && state.firstEventAt)) && (
-          <section aria-label="Kindred" className="mt-4">
-            <SectionLabel label="Kindred" hint="Same feel, different scene" />
-            <ul className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
-              <AlbumCards
-                albums={kindred}
-                coverClass="size-18"
-                placeholderClass={KINDRED_PLACEHOLDER}
-                isStandalone={true}
-              />
-              {isStreaming &&
-                Array.from(
-                  {
-                    length: Math.max(
-                      0,
-                      KINDRED_COUNT -
-                        kindred.filter((a) => !isRejected(a)).length,
-                    ),
-                  },
-                  (_, i) => (
-                    <AlbumCardPlaceholder
-                      key={`reserved-${i}`}
-                      coverClass="size-18"
-                      className={KINDRED_PLACEHOLDER}
-                    />
-                  ),
-                )}
-            </ul>
           </section>
         )}
 
@@ -171,15 +134,28 @@ export function ChartExplorer() {
             />
           </div>
         )}
+        {/* Kindred last: the cross-genre picks, "same feel, different genre". After the lineage
+            story (roots → nearest neighbors → branches) they're the sideways step, and they sit
+            outside the hourglass because they're off the genre path. At the bottom, nothing
+            below them moves when they arrive, so they need no reserved space. */}
+        {kindred.some((a) => !isRejected(a)) && (
+          <section aria-label="Kindred" className="mt-6">
+            <SectionLabel label="Kindred" hint="Same feel, different genre" />
+            <ul className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
+              <AlbumCards albums={kindred} coverClass="size-18" isStandalone={true} />
+            </ul>
+          </section>
+        )}
+
+        {/* At the bottom of the page. Timings are dev info for now; the planned debug panel
+            is their real home. */}
+        <div className="mt-auto">
+          <StatusLine state={state} />
+        </div>
       </div>
     </ActiveTrait>
   );
 }
-
-// The prompt asks for 3 kindred picks.
-const KINDRED_COUNT = 3;
-// About a real kindred card's height (~180px), so the roots below don't move when it swaps in.
-const KINDRED_PLACEHOLDER = "min-h-45";
 
 function StatusLine({ state }: { state: ChartState }) {
   const confirmed = state.albums.filter((a) => a.check?.found).length;
@@ -216,14 +192,12 @@ function StatusLine({ state }: { state: ChartState }) {
 }
 
 // Which real events the seed loader has seen. Its loading state ends at the first confirmed
-// kindred album (the "listen to this next" row is ready), or when the stream stops for any reason.
+// album, when the lineage below has something to read, or when the stream stops for any reason.
 function seedProgress(state: ChartState): SeedProgress {
-  const kindred = state.albums.filter((a) => a.album.kindred);
   return {
     traitsArrived: state.seed !== undefined,
-    kindredNamed: kindred.length > 0,
-    finished:
-      state.status !== "streaming" || kindred.some((a) => a.check?.found),
+    albumsNamed: state.albums.length > 0,
+    finished: state.status !== "streaming" || state.albums.some((a) => a.check?.found),
   };
 }
 

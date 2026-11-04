@@ -34,19 +34,26 @@ export function AlbumCard({
   const dimmed = useDimmed(album);
   return (
     <li
-      className={`flow-root transition-opacity duration-200 shadow-sm ${isStandalone ? "bg-[linear-gradient(45deg,_rgba(255,_255,_255,_0.145),_transparent)] rounded p-4 animate-[fade-in_.5s_ease-out]" : ""} ${dimmed ? "opacity-30" : ""}`}
+      className={`flow-root transition-opacity duration-200 ${dimmed ? "opacity-30" : ""}`}
     >
       <Cover
         url={check.coverUrl}
         className={`float-left mt-0.5 mr-3 mb-1.5 ${coverClass}`}
       />
-      <p className="text-sm">
+      <p className="text-md">
         <span className="font-semibold">{album.title}</span>{" "}
-        <span className="text-white/60">· {album.artist},</span>
-        <span className="font-mono text-white/60">
-          {" "}
+      </p>
+      <p>
+        <span className="text-white/60">
+          {album.artist} {" — "}
+        </span>
+        <span className="font-mono text-white/40">
           {albumYear(album, check)}
         </span>
+        {/* Kindred picks only: the genre outside the chart that makes them kindred. */}
+        {album.kindredGenre && (
+          <span className="text-white/40"> · {album.kindredGenre}</span>
+        )}
       </p>
       <p className="mt-0.5 mb-2 text-[13px] text-white/60">{album.why}</p>
       <TraitList traits={album.sharedTraits} />

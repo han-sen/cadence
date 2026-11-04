@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { parse as parsePartialJson } from "partial-json";
 import type { ChartEvent } from "./events";
+import { chartGenreMatching } from "./kindred";
 import { verifyAlbum } from "./musicbrainz";
 import { EFFORT, MODEL, SYSTEM, userMessage } from "./prompt";
 import { AlbumPick, Genre, LineageChart } from "./schema";
@@ -28,6 +29,8 @@ export async function streamChart(artist: string, title: string, { emit, signal 
   let seedSent = false;
   let genresSent = 0;
   let albumsSent = 0;
+  // Every genre streams before any album, so this is the full list by the time albums arrive.
+  const chartGenres: Genre[] = [];
 
   // MusicBrainz checks run one after another (it allows ~1 request/second) while
   // Claude keeps streaming, so the chart fills in and gets verified at the same time.
@@ -35,6 +38,13 @@ export async function streamChart(artist: string, title: string, { emit, signal 
   const sendAlbum = (album: AlbumPick) => {
     const id = albumsSent++;
     emit({ type: "album", id, album });
+    // A kindred pick from one of the chart's own genres would take an album that belongs in
+    // the lineage sections, so it's rejected without spending a MusicBrainz lookup.
+    const sameGenre = album.kindred && album.kindredGenre ? chartGenreMatching(album.kindredGenre, chartGenres) : undefined;
+    if (sameGenre) {
+      emit({ type: "verified", id, check: { found: false, reason: `Kindred pick is in the chart's own genre (${sameGenre.name})` } });
+      return;
+    }
     verifications = verifications.then(async () => {
       if (signal.aborted) return;
       emit({ type: "verified", id, check: await verifyAlbum(album.artist, album.title) });
@@ -56,7 +66,10 @@ export async function streamChart(artist: string, title: string, { emit, signal 
     const genresDone = closed || "albums" in json ? genres.length : genres.length - 1;
     for (; genresSent < genresDone; genresSent++) {
       const genre = Genre.safeParse(genres[genresSent]);
-      if (genre.success) emit({ type: "genre", genre: genre.data });
+      if (genre.success) {
+        chartGenres.push(genre.data);
+        emit({ type: "genre", genre: genre.data });
+      }
     }
 
     const albums = Array.isArray(json.albums) ? json.albums : [];

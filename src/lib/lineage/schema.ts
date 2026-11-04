@@ -26,7 +26,11 @@ export const AlbumPick = z.object({
     .describe("Genre lane this album sits in; null for kindred picks"),
   kindred: z
     .boolean()
-    .describe("True for contemporaries that share traits but aren't on the genre path"),
+    .describe("True for cross-genre picks from any era that share the seed's traits"),
+  kindredGenre: z
+    .string()
+    .nullable()
+    .describe("Kindred picks only: the album's own genre, which must not be one of the chart's genres. null for genre albums"),
   why: z
     .string()
     .describe("One or two sentences on why a fan of the seed would like it, naming something concrete you'd hear; vary the opening"),

@@ -9,14 +9,14 @@ import { Cover } from "./cover";
 // 2. It lands on the seed sleeve, which shows the cover as color halftone dots on paper. The dots
 //    get finer at each real stream event, and creep a little in between so they never sit
 //    still, but never run ahead of real progress.
-// 3. When the first kindred album is confirmed (or the stream ends), the dots dissolve into
-//    the plain cover.
+// 3. When the first album is confirmed (or the stream ends), the dots dissolve into the plain
+//    cover: the page below now has something to read.
 // Falls back to a plain <Cover> under prefers-reduced-motion or without WebGL.
 
 export type SeedProgress = {
   traitsArrived: boolean;
-  kindredNamed: boolean;
-  // The first kindred album was confirmed, or the stream ended some other way.
+  albumsNamed: boolean;
+  // The first album was confirmed, or the stream ended some other way.
   finished: boolean;
 };
 
@@ -137,8 +137,8 @@ function AnimatedSeed({ coverUrl, progress, className }: { coverUrl: string; pro
       last = now;
       const { progress, landed, placed } = live.current;
 
-      // Current stage: -1 still in the crate, 0 landed, 1 traits in, 2 kindred named.
-      const stage = !landed ? -1 : progress.kindredNamed ? 2 : progress.traitsArrived ? 1 : 0;
+      // Current stage: -1 still in the crate, 0 landed, 1 traits in, 2 albums named.
+      const stage = !landed ? -1 : progress.albumsNamed ? 2 : progress.traitsArrived ? 1 : 0;
       for (let i = 0; i <= stage; i++) stageStart[i] ??= now;
       let target = 0;
       if (stage >= 0) {
