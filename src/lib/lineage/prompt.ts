@@ -17,6 +17,7 @@ Content (the recommendations):
 - Avoid the seed artist, and use each artist at most once.
 - seed.traits: 4-6 concrete traits describing the seed's sound, mood or scene. Make them vivid and specific to this record, not generic labels. They show as tags, so keep each to one idea in 2-4 words (30 characters at most), lowercase except for names. Good: "hypnotic motorik drums", "Manchester 1979". Too long: "hypnotic motorik drumming with droning organ and tape loops". Each album's sharedTraits must come from that list.
 - "why" is one or two sentences, written like a friend with good taste recommending the record: name something concrete you'd hear on it (a sound, a texture, a moment, a feeling) and how it connects to what the listener likes about the seed. Vary how each one opens, the way a person would across a stack of recommendations: sometimes lead with the album's sound, sometimes the shared trait, sometimes the artist or the scene. Never start with "If you love" or "If you like", and don't reuse an opening phrase within the chart. Never claim the album influenced the seed.
+- "seed" is this prompt's internal word and never appears in text the listener reads ("why" and traits). Refer to the seed album by its title, or as "this record" or the artist's name.
 
 Accuracy:
 - Only recommend real, commercially released studio albums or EPs. Use the official title with no edition or remaster suffixes, and the artist name as credited.

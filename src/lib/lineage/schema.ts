@@ -33,7 +33,7 @@ export const AlbumPick = z.object({
     .describe("Kindred picks only: the album's own genre, which must not be one of the chart's genres. null for genre albums"),
   why: z
     .string()
-    .describe("One or two sentences on why a fan of the seed would like it, naming something concrete you'd hear; vary the opening"),
+    .describe("One or two sentences on why a fan of the seed would like it, naming something concrete you'd hear; vary the opening. Call the seed album by its title, never \"the seed\""),
   sharedTraits: z.array(z.string()).describe("Traits from seed.traits this album shares"),
 });
 
