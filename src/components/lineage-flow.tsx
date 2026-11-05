@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { skippedParents } from "@/lib/lineage/cables";
 import type { Genre } from "@/lib/lineage/schema";
 import type { AlbumEntry } from "@/lib/lineage/use-chart-stream";
 import { AlbumCards, isRejected } from "./album-card";
@@ -52,7 +51,7 @@ export function LineageFlow({
 // Section label with its subtitle on a second line, so it stays narrow and clear of cables.
 export function SectionLabel({ label, hint }: { label: string; hint: string }) {
   return (
-    <h2 className="mb-3 text-xs font-semibold tracking-wider text-white/60 uppercase">
+    <h2 className="mb-3 text-lg font-semibold tracking-wider text-white/60 uppercase">
       {label}
       <span className="mt-0.5 block font-normal font-mono tracking-normal text-white/45 normal-case">
         {hint}
@@ -94,37 +93,35 @@ function GenreRow({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:gap-10">
       {genres.map((g) => (
-        <GenreCard key={g.id} genre={g} genres={all} albums={albumsOf(g)} emphasis={emphasis} />
+        <GenreCard
+          key={g.id}
+          genre={g}
+          genres={all}
+          albums={albumsOf(g)}
+          emphasis={emphasis}
+        />
       ))}
     </div>
   );
 }
 
-// Genre name and year, plus the parent genres in text where there's no cable to show them:
-// all of them on phones (cables are hidden), and only skipped tiers on wider screens.
+// Genre name and year. On phones, where cables are hidden, the parent genres follow as text.
 function GenreHeading({ genre, genres }: { genre: Genre; genres: Genre[] }) {
   const parents = genre.parentIds
     .map((id) => genres.find((g) => g.id === id)?.name)
     .filter(Boolean);
-  const skipped = skippedParents(genre, genres).map((g) => g.name);
   return (
     <>
-      <h3 className="text-lg font-semibold">
-        {genre.name}{" "}
-        <span className="font-normal text-white/60">
-          · c. {genre.emergedYear}
+      <h3 className="text-lg font-semibold p-4">
+        <span className="pr-4">{genre.name}</span>
+
+        <span className="font-mono text-md text-white/60">
+          c. {genre.emergedYear}
         </span>
       </h3>
       {parents.length > 0 && (
         <p className="text-xs text-white/45 sm:hidden">
           from {parents.join(" + ")}
-        </p>
-      )}
-      {skipped.length > 0 && (
-        <p className="text-xs text-white/45 max-sm:hidden">
-          {/* "also" only when other parents already have cables into this card. */}
-          {skipped.length < genre.parentIds.length ? "also " : ""}from{" "}
-          {skipped.join(" + ")}
         </p>
       )}
     </>
@@ -149,11 +146,11 @@ function GenreCard({
   return (
     <div
       data-genre-id={genre.id}
-      className={`${CARD} min-w-0 flex-1 p-4 sm:px-5 sm:py-4.5 ${emphasis ? "border-white/20 bg-white/8" : ""}`}
+      className={`${CARD} min-w-0 flex-1 p-0 ${emphasis ? "border-white/20 bg-white/8" : ""}`}
     >
       <GenreHeading genre={genre} genres={genres} />
       <GenreStatus albums={albums} />
-      <ul className="mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-6 gap-y-4.5">
+      <ul className="mt-0 grid overflow-hidden grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-0">
         <AlbumCards
           albums={albums}
           coverClass="size-16 sm:size-22"
