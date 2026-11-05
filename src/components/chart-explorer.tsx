@@ -142,7 +142,11 @@ export function ChartExplorer() {
           <section aria-label="Kindred" className="mt-6">
             <SectionLabel label="Kindred" hint="Same feel, different genre" />
             <ul className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
-              <AlbumCards albums={kindred} coverClass="size-18" isStandalone={true} />
+              <AlbumCards
+                albums={kindred}
+                coverClass="size-18"
+                isStandalone={true}
+              />
             </ul>
           </section>
         )}
@@ -197,16 +201,20 @@ function seedProgress(state: ChartState): SeedProgress {
   return {
     traitsArrived: state.seed !== undefined,
     albumsNamed: state.albums.length > 0,
-    finished: state.status !== "streaming" || state.albums.some((a) => a.check?.found),
+    finished:
+      state.status !== "streaming" || state.albums.some((a) => a.check?.found),
   };
 }
 
 // Staged lines next to the seed cover until the traits replace them. They set the mood only:
 // the halftone carries the real progress. The last line holds however long the wait is.
 const LISTENING = [
-  "Listening closely…",
-  "Analyzing the album's sound…",
-  "Finding what makes it feel the way it does…",
+  "Listening closely...",
+  "Analyzing the album's sound...",
+  "Finding what makes it feel the way it does...",
+  "Generating mood labels...",
+  "Analyzing album lineage...",
+  "Finalizing recommendations...",
 ];
 const LINE_MS = 3500;
 
