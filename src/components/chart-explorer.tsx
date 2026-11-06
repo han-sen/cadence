@@ -11,6 +11,7 @@ import { AlbumSearch } from "./album-search";
 import { LineageFlow, SectionLabel } from "./lineage-flow";
 import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
+import { AuthButton } from "./auth-button";
 
 // The chart page: search, the seed header, the lineage as an hourglass (roots → nearest
 // neighbors → branches), then kindred picks from other genres. Everything fills in as the
@@ -48,6 +49,7 @@ export function ChartExplorer() {
             Name an album you love. See where it came from, where it led, and
             what to play next.
           </p>
+          <AuthButton />
         </header>
 
         <div className="flex flex-col gap-3 sm:flex-row">
