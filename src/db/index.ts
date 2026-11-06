@@ -1,9 +1,9 @@
 import "server-only";
 import * as schema from "./schema";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { requireEnv } from "@/lib/env";
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL is not set. Add it to .env.local.");
+const url = requireEnv("DATABASE_URL");
 
 const globalForDb = globalThis as unknown as {
   db?: NodePgDatabase<typeof schema>;
