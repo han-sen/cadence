@@ -1,7 +1,16 @@
 "use client";
 
 import { useRef } from "react";
-import { ComboBox, Input, Label, ListBox, ListBoxItem, Popover, Text, useAsyncList } from "react-aria-components";
+import {
+  ComboBox,
+  Input,
+  Label,
+  ListBox,
+  ListBoxItem,
+  Popover,
+  Text,
+  useAsyncList,
+} from "react-aria-components";
 import { type AlbumSuggestion, SearchResponse } from "@/lib/lineage/schema";
 import { Cover } from "./cover";
 
@@ -14,7 +23,15 @@ const label = (album: AlbumSuggestion) => `${album.title} — ${album.artist}`;
 // arrow keys, Enter, Escape, focus, and announcing results to screen readers.
 // useAsyncList runs `load` whenever the text changes and aborts the previous run, so only the
 // latest search can update the list.
-export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumSuggestion) => void; isDisabled: boolean }) {
+export function AlbumSearch({
+  onSelect,
+  isDisabled,
+  placeholder = "Search by album or artist, e.g. Untrue Burial",
+}: {
+  onSelect: (album: AlbumSuggestion) => void;
+  isDisabled: boolean;
+  placeholder?: string;
+}) {
   // Picking an album fills the input with its label; that text shouldn't trigger a new search.
   const pickedLabel = useRef<string | null>(null);
 
@@ -28,19 +45,23 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
       await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS));
       signal.throwIfAborted();
 
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal });
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+        signal,
+      });
       const body: unknown = await res.json().catch(() => null);
       if (!res.ok) {
         const message = (body as { error?: string } | null)?.error;
         throw new Error(message ?? "Album search failed.");
       }
       const parsed = SearchResponse.safeParse(body);
-      if (!parsed.success) throw new Error("Album search returned something unexpected.");
+      if (!parsed.success)
+        throw new Error("Album search returned something unexpected.");
       return { items: parsed.data.results };
     },
   });
 
-  const searching = list.isLoading && list.filterText.trim().length >= MIN_CHARS;
+  const searching =
+    list.isLoading && list.filterText.trim().length >= MIN_CHARS;
 
   return (
     <ComboBox
@@ -63,10 +84,14 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
       <Label className="meta text-(--muted)">Album</Label>
       <div className="relative">
         <Input
-          placeholder="Search by album or artist, e.g. Untrue Burial"
-          className={`h-14 w-full rounded-full border-2 border-transparent bg-background px-6 text-base outline-none placeholder:text-(--faint) focus:border-accent disabled:opacity-60 sm:text-lg ${searching ? "pr-28" : ""}`}
+          placeholder={placeholder}
+          className={`h-14 w-full rounded-full border-2 border-transparent bg-background px-6 text-base outline-none placeholder:text-(--faint) focus:border-accent disabled:cursor-not-allowed disabled:text-(--muted) disabled:placeholder:text-(--muted) sm:text-lg ${searching ? "pr-28" : ""}`}
         />
-        {searching && <span className="meta absolute top-1/2 right-6 -translate-y-1/2 text-(--faint)">Searching…</span>}
+        {searching && (
+          <span className="meta absolute top-1/2 right-6 -translate-y-1/2 text-(--faint)">
+            Searching…
+          </span>
+        )}
       </div>
       {list.error && (
         <Text slot="errorMessage" className="text-sm text-red-600">
@@ -102,7 +127,10 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
                 <Text slot="label" className="truncate text-sm font-medium">
                   {album.title}
                 </Text>
-                <Text slot="description" className="truncate text-xs text-(--muted)">
+                <Text
+                  slot="description"
+                  className="truncate text-xs text-(--muted)"
+                >
                   {album.artist}
                   {album.year ? ` · ${album.year}` : ""}
                   {album.type === "EP" ? " · EP" : ""}

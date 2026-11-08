@@ -13,6 +13,7 @@ import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
 import { GradientBackdrop } from "./gradient-backdrop";
 import { DuotoneBackdrop } from "./duotone-backdrop";
+import { authClient } from "@/lib/auth-client";
 
 // The chart page: search, the seed header, the lineage as an hourglass (roots →
 // siblings → branches), then kindred picks from other genres. Everything fills in as the
@@ -24,6 +25,10 @@ export function ChartExplorer() {
   const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
   const [activeTrait, setActiveTrait] = useState<string | null>(null);
   const isStreaming = state.status === "streaming";
+  // Search needs a session (the API returns 401 without one). While the session is still
+  // loading, the box stays disabled too, so it can't be used a moment before it's allowed.
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const signedOut = !sessionPending && !session;
 
   // Clicking the active trait again clears it.
   const traitContext = useMemo(
@@ -53,7 +58,8 @@ export function ChartExplorer() {
             </h1>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <AlbumSearch
-                isDisabled={isStreaming}
+                isDisabled={isStreaming || !session}
+                placeholder={signedOut ? "Sign in to pick an album" : undefined}
                 onSelect={(album) => {
                   setPicked(album);
                   setActiveTrait(null);
