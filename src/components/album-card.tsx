@@ -23,11 +23,15 @@ export const albumYear = (album: AlbumPick, check: Confirmed) =>
 // and the last row has no bottom line. The list clips the leftmost line at the card's edge.
 // Kindred albums stand alone, so they keep a full border.
 const cardFrame = (isStandalone: boolean) =>
-  `p-4 border-white/6 ${isStandalone ? "border" : "-ml-px border-t border-l"}`;
+  isStandalone
+    ? "rounded-3xl bg-white p-5"
+    : "-ml-px border-t border-l border-(--line) p-5";
 
-// Full album card: cover, title, "why" and shared traits. The cover floats left so the text
-// wraps underneath it instead of leaving a tall empty column; flow-root keeps the float inside.
-// `coverClass` sets the cover size, e.g. "size-18".
+// Full album card: cover and title, then "why", links and shared traits. Stacked in a narrow
+// card; once the card is 400px wide (an odd last album spanning its genre card, say) the
+// second part moves beside the first. `coverClass` sets the cover size, e.g. "size-18".
+const WIDE =
+  "@[400px]:grid @[400px]:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] @[400px]:gap-x-8";
 export function AlbumCard({
   album,
   check,
@@ -42,33 +46,36 @@ export function AlbumCard({
   const dimmed = useDimmed(album);
   return (
     <li
-      className={`flow-root ${cardFrame(isStandalone)} transition-opacity duration-200 ${dimmed ? "opacity-30" : ""}`}
+      className={`@container ${cardFrame(isStandalone)} transition-opacity duration-200 ${dimmed ? "opacity-30" : ""}`}
     >
-      <div className="flex gap-4">
-        <Cover url={check.coverUrl} className={coverClass} />
-        <div className="flex flex-col justify-between">
-          <div>
-            <p className="text-md">
-              <span className="font-semibold">{album.title}</span>{" "}
-            </p>
-            <span className="text-white/60">
-              {album.artist} {" — "}
-            </span>
-            <span className="font-mono text-white/40">
-              {albumYear(album, check)}
-            </span>
-          </div>
+      <div className={WIDE}>
+        <div className="flex gap-4">
+          <Cover url={check.coverUrl} className={coverClass} />
+          <div className="flex flex-col justify-between">
+            <div>
+              <p className="text-lg leading-tight font-semibold tracking-tight">
+                {album.title}
+              </p>
+              <p className="mt-0.5 text-(--muted)">{album.artist}</p>
+              <p className="meta mt-1.5 text-(--faint)">
+                {albumYear(album, check)}
+              </p>
+            </div>
 
-          {/* Kindred picks only: the genre outside the chart that makes them kindred. */}
-          {/* {album.kindredGenre && (
+            {/* Kindred picks only: the genre outside the chart that makes them kindred. */}
+            {/* {album.kindredGenre && (
               <span className="text-white/40"> · {album.kindredGenre}</span>
             )} */}
+          </div>
+        </div>
+        <div>
+          <p className="mt-4 text-sm leading-snug text-(--muted) @[400px]:mt-0">
+            {album.why}
+          </p>
+          <AlbumLinks artist={album.artist} title={album.title} />
+          <TraitList traits={album.sharedTraits} />
         </div>
       </div>
-      <p className="mt-2 mb-2 text-[13px] text-white/60">{album.why}</p>
-      <AlbumLinks artist={album.artist} title={album.title} />
-
-      <TraitList traits={album.sharedTraits} />
     </li>
   );
 }
@@ -87,23 +94,30 @@ export function AlbumCardPlaceholder({
   className?: string;
 }) {
   return (
-    <li aria-hidden className={`animate-pulse ${cardFrame(isStandalone)} ${className}`}>
-      <div className="flex gap-4">
-        <CoverPlaceholder className={coverClass} />
-        <div className="flex flex-1 flex-col gap-2 pt-1">
-          <div className="h-4 w-2/3 rounded bg-white/10" />
-          <div className="h-4 w-1/2 rounded bg-white/10" />
+    <li
+      aria-hidden
+      className={`@container animate-pulse ${cardFrame(isStandalone)} ${className}`}
+    >
+      <div className={WIDE}>
+        <div className="flex gap-4">
+          <CoverPlaceholder className={coverClass} />
+          <div className="flex flex-1 flex-col gap-2 pt-1">
+            <div className="h-4 w-2/3 rounded bg-(--chip)" />
+            <div className="h-4 w-1/2 rounded bg-(--chip)" />
+          </div>
+        </div>
+        <div>
+          <div className="mt-3 mb-3 flex flex-col gap-2 @[400px]:mt-0">
+            <div className="h-3 w-full rounded bg-(--chip)" />
+            <div className="h-3 w-5/6 rounded bg-(--chip)" />
+          </div>
+          <div className="flex gap-2">
+            <div className="size-7 rounded-full bg-(--chip)" />
+            <div className="size-7 rounded-full bg-(--chip)" />
+          </div>
+          <div className="mt-3 h-6 w-1/3 rounded-full bg-(--chip)" />
         </div>
       </div>
-      <div className="mt-3 mb-3 flex flex-col gap-2">
-        <div className="h-3 w-full rounded bg-white/10" />
-        <div className="h-3 w-5/6 rounded bg-white/10" />
-      </div>
-      <div className="flex gap-2">
-        <div className="size-6 rounded bg-white/10" />
-        <div className="size-6 rounded bg-white/10" />
-      </div>
-      <div className="mt-3 h-5 w-1/3 rounded-full bg-white/10" />
     </li>
   );
 }

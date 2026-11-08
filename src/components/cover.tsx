@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const BOX = "shrink-0 rounded bg-white/10";
+const BOX = "shrink-0 rounded-md bg-(--chip)";
 
 // Covers come from the Cover Art Archive via two redirects into archive.org, so they can take a
 // few seconds and occasionally fail. Pulses while loading, retries once, and shows a distinct
@@ -24,7 +24,7 @@ export function Cover({ url, className }: { url: string; className: string }) {
 
   if (status === "missing") {
     return (
-      <div aria-hidden className={`${BOX} ${className} grid place-items-center text-white/40`}>
+      <div aria-hidden className={`${BOX} ${className} grid place-items-center text-(--faint)`}>
         ♪
       </div>
     );

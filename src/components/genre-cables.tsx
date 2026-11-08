@@ -52,16 +52,16 @@ export function GenreCables({ genres }: { genres: Genre[] }) {
     >
       <g
         fill="none"
-        stroke="rgb(255 255 255 / .55)"
+        stroke="var(--accent)"
         strokeWidth={2.5}
         strokeLinecap="round"
-        opacity={0.5}
+        opacity={0.7}
       >
         {drawing.cables.map((d, i) => (
           <path key={i} d={d} />
         ))}
       </g>
-      <g fill="#d9efe9" opacity={0.75}>
+      <g fill="var(--accent-deep)">
         {drawing.sockets.map((s, i) => (
           <circle key={i} cx={s.x} cy={s.y} r={5} />
         ))}

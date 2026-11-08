@@ -4,8 +4,8 @@ import { Button } from "react-aria-components";
 import { authClient } from "@/lib/auth-client";
 
 const BUTTON =
-  "rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-white/80 " +
-  "transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60";
+  "rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white uppercase " +
+  "transition-colors hover:bg-accent-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 export function AuthButton() {
   const { data, isPending } = authClient.useSession();
@@ -36,7 +36,7 @@ export function AuthButton() {
           className="size-8 rounded-full"
         />
       )}
-      <span className="text-sm text-white/80">{user.name}</span>
+      <span className="text-sm font-medium">{user.name}</span>
       <Button className={BUTTON} onPress={() => authClient.signOut()}>
         Sign out
       </Button>

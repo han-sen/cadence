@@ -35,8 +35,10 @@ export function TraitList({ traits }: { traits: string[] }) {
               type="button"
               aria-pressed={pressed}
               onClick={() => toggle(t)}
-              className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
-                pressed ? "bg-white text-zinc-950" : "bg-white/10 text-white/80 hover:bg-white/20"
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                pressed
+                  ? "border-transparent bg-(--btn-bg) text-(--btn-fg)"
+                  : "border-(--line) text-(--ink) hover:bg-(--chip)"
               }`}
             >
               {t}

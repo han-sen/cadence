@@ -60,27 +60,27 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
       isDisabled={isDisabled}
       className="flex flex-1 flex-col gap-1"
     >
-      <Label className="text-sm font-medium">Album</Label>
+      <Label className="meta text-(--muted)">Album</Label>
       <div className="relative">
         <Input
           placeholder="Search by album or artist, e.g. Untrue Burial"
-          className="h-10 w-full rounded-md border border-white/15 bg-white/5 px-3 pr-24 outline-none placeholder:text-white/45 focus:border-white/40 disabled:opacity-60"
+          className={`h-14 w-full rounded-full border-2 border-transparent bg-background px-6 text-base outline-none placeholder:text-(--faint) focus:border-accent disabled:opacity-60 sm:text-lg ${searching ? "pr-28" : ""}`}
         />
-        {searching && <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-white/45">Searching…</span>}
+        {searching && <span className="meta absolute top-1/2 right-6 -translate-y-1/2 text-(--faint)">Searching…</span>}
       </div>
       {list.error && (
-        <Text slot="errorMessage" className="text-sm text-red-300">
+        <Text slot="errorMessage" className="text-sm text-red-600">
           {list.error.message}
         </Text>
       )}
       <Popover
         offset={4}
-        className="w-(--trigger-width) overflow-auto rounded-md border border-white/15 bg-[#01302c]/85 shadow-lg shadow-black/30 backdrop-blur-xl"
+        className="w-(--trigger-width) overflow-auto rounded-3xl bg-white shadow-xl shadow-accent-deep/15 ring-1 ring-(--line)"
       >
         <ListBox
-          className="max-h-96 p-1 outline-none"
+          className="max-h-96 p-2 outline-none"
           renderEmptyState={() => (
-            <p className="px-2 py-1.5 text-sm text-white/60">
+            <p className="px-3 py-2 text-sm text-(--muted)">
               {list.filterText.trim().length < MIN_CHARS
                 ? "Keep typing…"
                 : list.isLoading
@@ -95,14 +95,14 @@ export function AlbumSearch({ onSelect, isDisabled }: { onSelect: (album: AlbumS
             <ListBoxItem
               id={album.mbid}
               textValue={label(album)}
-              className="flex cursor-default items-center gap-3 rounded px-2 py-1.5 outline-none data-focused:bg-white/10"
+              className="flex cursor-default items-center gap-3 rounded-2xl px-3 py-2 outline-none data-focused:bg-accent/10"
             >
               <Cover url={album.coverUrl} className="size-10" />
               <span className="flex min-w-0 flex-col">
                 <Text slot="label" className="truncate text-sm font-medium">
                   {album.title}
                 </Text>
-                <Text slot="description" className="truncate text-xs text-white/60">
+                <Text slot="description" className="truncate text-xs text-(--muted)">
                   {album.artist}
                   {album.year ? ` · ${album.year}` : ""}
                   {album.type === "EP" ? " · EP" : ""}

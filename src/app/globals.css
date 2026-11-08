@@ -1,19 +1,67 @@
 @import "tailwindcss";
 
-/* One dark theme only (design decision): `dark:` styles always apply, whatever the OS setting. */
-@custom-variant dark (&:where(.dark, .dark *));
+/* A light bento look. Lavender page, white rounded cards,
+   one electric blue accent, tight all-caps grotesk headlines, tiny uppercase meta labels. */
 
 :root {
-  --background: #021117;
-  --foreground: #ffffff;
-  color-scheme: dark;
+  --background: #e9e9f2;
+  --foreground: #0b0b14;
+  --accent: #5161ff;
+  --accent-deep: #1f22b8;
+  color-scheme: light;
+
+  /* Colors that flip with the surface a component sits on. White cards use these defaults;
+     `.surface-blue` swaps them, so the same album card works on either. */
+  --ink: #0b0b14;
+  --muted: rgb(11 11 20 / 0.55);
+  --faint: rgb(11 11 20 / 0.38);
+  --line: rgb(11 11 20 / 0.09);
+  --chip: rgb(11 11 20 / 0.06);
+  --btn-bg: var(--accent);
+  --btn-fg: #ffffff;
+}
+
+.surface-blue {
+  --ink: #ffffff;
+  --muted: rgb(255 255 255 / 0.75);
+  --faint: rgb(255 255 255 / 0.55);
+  --line: rgb(255 255 255 / 0.2);
+  --chip: rgb(255 255 255 / 0.16);
+  --btn-bg: #ffffff;
+  --btn-fg: var(--accent);
+  color: var(--ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --font-sans: var(--font-inter-tight);
   --font-mono: var(--font-geist-mono);
+}
+
+/* Tiny uppercase labels set in the corners of cards, like the reference's "IBICON.COM". */
+@utility meta {
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Big tight all-caps headline type. */
+@utility display {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+}
+
+/* A halftone-style dot screen in the deep blue, echoing the seed loader's dots. */
+@utility dots {
+  background-image: radial-gradient(rgb(15 18 140 / 0.55) 1.6px, transparent 1.8px);
+  background-size: 9px 9px;
 }
 
 @keyframes fade-in {
@@ -23,16 +71,9 @@
   }
 }
 
-/* Wander for the background's blurred pools. Each pool sets its own --dx, --dy and --s. */
-@keyframes drift {
-  to {
-    transform: translate(var(--dx, 6vw), var(--dy, 4vh)) scale(var(--s, 1.08));
-  }
-}
-
 body {
-  /* Base color only; the background design itself is the fixed layer in components/background.tsx. */
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-inter-tight), system-ui, sans-serif;
+  letter-spacing: -0.01em;
 }

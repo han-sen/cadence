@@ -34,7 +34,7 @@ const CEILING = 0.85;
 const CREEP_TAU_S = 4;
 
 // Search results use the 250px thumbnails; the seed is drawn larger, so ask for 500px.
-const largeCover = (url: string) => url.replace(/front-250$/, "front-500");
+export const largeCover = (url: string) => url.replace(/front-250$/, "front-500");
 
 function canAnimate() {
   if (typeof window === "undefined") return false;

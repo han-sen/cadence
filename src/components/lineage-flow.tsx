@@ -7,7 +7,7 @@ import { AlbumCards, isRejected } from "./album-card";
 import { GenreCables } from "./genre-cables";
 
 // The chart's lineage as an hourglass: the genres it grew out of (roots) flow into its own
-// genres (nearest neighbors, the middle tier), which fan out into what came after
+// genres (siblings, the middle tier), which fan out into what came after
 // (branches). Cables follow the real "grew out of" links, so scrolling down reads as moving
 // forward in time without a year axis.
 export function LineageFlow({
@@ -35,7 +35,7 @@ export function LineageFlow({
         </Tier>
       )}
       {seed.length > 0 && (
-        <Tier label="Nearest neighbors" hint="Same scene">
+        <Tier label="Siblings" hint="Same scene">
           <GenreRow genres={seed} all={genres} albumsOf={albumsOf} emphasis />
         </Tier>
       )}
@@ -51,12 +51,10 @@ export function LineageFlow({
 // Section label with its subtitle on a second line, so it stays narrow and clear of cables.
 export function SectionLabel({ label, hint }: { label: string; hint: string }) {
   return (
-    <h2 className="mb-3 text-lg font-semibold tracking-wider text-white/60 uppercase">
-      {label}
-      <span className="mt-0.5 block font-normal font-mono tracking-normal text-white/45 normal-case">
-        {hint}
-      </span>
-    </h2>
+    <div className="flex flex-col gap-1.5">
+      <span className="meta text-(--muted)">{hint}</span>
+      <h2 className="display text-4xl sm:text-5xl">{label}</h2>
+    </div>
   );
 }
 
@@ -70,7 +68,7 @@ function Tier({
   children: ReactNode;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <SectionLabel label={label} hint={hint} />
       {children}
     </div>
@@ -91,7 +89,7 @@ function GenreRow({
   emphasis?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:gap-10">
+    <div className="flex flex-col gap-4 sm:flex-row sm:gap-8 my-6">
       {genres.map((g) => (
         <GenreCard
           key={g.id}
@@ -112,15 +110,15 @@ function GenreHeading({ genre, genres }: { genre: Genre; genres: Genre[] }) {
     .filter(Boolean);
   return (
     <>
-      <h3 className="text-lg font-semibold p-4">
-        <span className="pr-4">{genre.name}</span>
-
-        <span className="font-mono text-md text-white/60">
-          c. {genre.emergedYear}
-        </span>
+      <div className="meta flex justify-between px-5 pt-5 text-(--muted)">
+        <span>Genre</span>
+        <span>c. {genre.emergedYear}</span>
+      </div>
+      <h3 className="display px-5 pt-3 pb-5 text-2xl sm:text-3xl">
+        {genre.name}
       </h3>
       {parents.length > 0 && (
-        <p className="text-xs text-white/45 sm:hidden">
+        <p className="meta -mt-3 px-5 pb-4 text-(--faint) sm:hidden">
           from {parents.join(" + ")}
         </p>
       )}
@@ -128,9 +126,18 @@ function GenreHeading({ genre, genres }: { genre: Genre; genres: Genre[] }) {
   );
 }
 
-const CARD = "rounded-xl border border-white/15 bg-white/5";
+const CARD = "overflow-hidden rounded-[28px]";
 
-// A genre with its albums, all open. Every tier uses it; nearest neighbors (the hourglass's
+// Album grids inside a genre card.
+// Siblings sit side by side in one wide card, so their albums fill a single row.
+const ROW_GRID = "grid-cols-[repeat(auto-fit,minmax(240px,1fr))]";
+// Roots and branches stack their genre cards, so each card is narrower: two columns when it
+// has room, and an odd last album spans both, so its top line runs the full width (at that
+// width the album card lays out side by side).
+const STACK_GRID =
+  "grid-cols-1 @[420px]:grid-cols-2 [&>li:last-child:nth-child(odd)]:col-span-full";
+
+// A genre with its albums, all open. Every tier uses it; siblings (the hourglass's
 // waist) gets a slightly brighter fill via `emphasis`.
 function GenreCard({
   genre,
@@ -146,11 +153,13 @@ function GenreCard({
   return (
     <div
       data-genre-id={genre.id}
-      className={`${CARD} min-w-0 flex-1 p-0 ${emphasis ? "border-white/20 bg-white/8" : ""}`}
+      className={`${CARD} @container min-w-0 flex-1 ${emphasis ? "surface-blue bg-accent" : "bg-white"}`}
     >
       <GenreHeading genre={genre} genres={genres} />
       <GenreStatus albums={albums} />
-      <ul className="mt-0 grid overflow-hidden grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-0">
+      <ul
+        className={`grid overflow-hidden ${emphasis ? ROW_GRID : STACK_GRID}`}
+      >
         <AlbumCards
           albums={albums}
           coverClass="size-16 sm:size-22"
@@ -164,10 +173,10 @@ function GenreCard({
 // Text for a genre that has no albums to show yet, or none that checked out.
 function GenreStatus({ albums }: { albums: AlbumEntry[] }) {
   if (!albums.length)
-    return <p className="mt-2 text-sm text-white/45">Picking albums…</p>;
+    return <p className="meta px-5 pb-5 text-(--faint)">Picking albums…</p>;
   if (albums.every(isRejected))
     return (
-      <p className="mt-2 text-sm text-white/45">
+      <p className="meta px-5 pb-5 text-(--faint)">
         No confirmed albums for this genre.
       </p>
     );
