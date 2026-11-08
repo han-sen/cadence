@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
     return Response.json(
-      { error: "Sign in to create a chart." },
+      { error: "Sign in to make a chart." },
       { status: 401 },
     );
   }
