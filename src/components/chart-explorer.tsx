@@ -12,7 +12,6 @@ import { LineageFlow, SectionLabel } from "./lineage-flow";
 import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
 import { GradientBackdrop } from "./gradient-backdrop";
-import { AuthButton } from "./auth-button";
 import { DuotoneBackdrop } from "./duotone-backdrop";
 
 // The chart page: search, the seed header, the lineage as an hourglass (roots →
@@ -44,19 +43,14 @@ export function ChartExplorer() {
 
   return (
     <ActiveTrait value={traitContext}>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:gap-5 sm:py-10">
-        {/* Bento header: the wordmark and search on a white card, the mark on a blue dot tile. */}
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 pt-2 pb-6 sm:gap-5 sm:pt-4 sm:pb-10">
+        {/* Bento top row: the pitch and search on a white card, the reading key on a blue dot tile. */}
         <div className="grid gap-4 sm:gap-5 lg:grid-cols-[2fr_1fr]">
           <header className="flex flex-col gap-6 rounded-[32px] bg-white p-6 sm:p-8">
-            <div className="flex items-center justify-between gap-4">
-              <span className="meta text-(--muted)">Genre lineage</span>
-              <AuthButton />
-            </div>
-            <h1 className="display text-6xl sm:text-8xl">Lineage</h1>
-            <p className="display max-w-xl text-xl text-(--muted) sm:text-2xl">
+            <h1 className="display max-w-xl text-3xl sm:text-4xl">
               Name an album you love. See where it came from, where it led, and
               what to play next.
-            </p>
+            </h1>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <AlbumSearch
                 isDisabled={isStreaming}

@@ -36,7 +36,7 @@ export function AuthButton() {
           className="size-8 rounded-full"
         />
       )}
-      <span className="text-sm font-medium">{user.name}</span>
+      <span className="hidden text-sm font-medium sm:inline">{user.name}</span>
       <Button className={BUTTON} onPress={() => authClient.signOut()}>
         Sign out
       </Button>
