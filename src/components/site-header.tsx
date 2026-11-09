@@ -7,10 +7,11 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4">
-        {/* Placeholder until there's a logo. */}
-        <Link href="/" className="display text-2xl">
-          Lineage
-        </Link>
+        {/* The page's main heading. Placeholder text until there's a logo (keep the h1 and give
+            the logo alt text "Lineage"). */}
+        <h1 className="display text-2xl">
+          <Link href="/">Lineage</Link>
+        </h1>
         <AuthButton />
       </div>
     </header>
