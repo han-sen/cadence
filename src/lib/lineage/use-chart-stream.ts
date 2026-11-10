@@ -35,9 +35,16 @@ function reducer(state: ChartState, action: Action): ChartState {
     case "start":
       return { ...initial, status: "streaming", startedAt: now };
     case "fail":
-      return { ...state, status: "error", error: action.message, finishedAt: now };
+      return {
+        ...state,
+        status: "error",
+        error: action.message,
+        finishedAt: now,
+      };
     case "cancel":
-      return state.status === "streaming" ? { ...state, status: "cancelled", finishedAt: now } : state;
+      return state.status === "streaming"
+        ? { ...state, status: "cancelled", finishedAt: now }
+        : state;
     case "event": {
       const s = state.firstEventAt ? state : { ...state, firstEventAt: now };
       const e = action.event;
@@ -49,9 +56,20 @@ function reducer(state: ChartState, action: Action): ChartState {
         case "album":
           return { ...s, albums: [...s.albums, { id: e.id, album: e.album }] };
         case "verified":
-          return { ...s, albums: s.albums.map((a) => (a.id === e.id ? { ...a, check: e.check } : a)) };
+          return {
+            ...s,
+            albums: s.albums.map((a) =>
+              a.id === e.id ? { ...a, check: e.check } : a,
+            ),
+          };
         case "done":
-          return { ...s, status: "done", usage: e.usage, model: e.model, finishedAt: now };
+          return {
+            ...s,
+            status: "done",
+            usage: e.usage,
+            model: e.model,
+            finishedAt: now,
+          };
         case "error":
           return { ...s, status: "error", error: e.message, finishedAt: now };
       }
@@ -71,7 +89,11 @@ function parseEvent(line: string): ChartEvent | null {
   }
   const result = ChartEvent.safeParse(json);
   if (!result.success) {
-    console.warn("Ignoring a malformed chart event:", z.prettifyError(result.error), json);
+    console.warn(
+      "Ignoring a malformed chart event:",
+      z.prettifyError(result.error),
+      json,
+    );
     return null;
   }
   return result.data;
@@ -85,53 +107,71 @@ export function useChartStream() {
   // If the component goes away mid-stream, stop the request so the server stops calling Claude.
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  const start = useCallback(async (artist: string, title: string) => {
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    dispatch({ type: "start", at: Date.now() });
+  const start = useCallback(
+    async (artist: string, title: string, mbid: string) => {
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      dispatch({ type: "start", at: Date.now() });
 
-    try {
-      const res = await fetch("/api/chart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artist, title }),
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) {
-        const body = await res.json().catch(() => null);
-        dispatch({ type: "fail", message: body?.error ?? `Request failed (${res.status}).`, at: Date.now() });
-        return;
+      try {
+        const res = await fetch("/api/chart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ artist, title, mbid }),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) {
+          const body = await res.json().catch(() => null);
+          dispatch({
+            type: "fail",
+            message: body?.error ?? `Request failed (${res.status}).`,
+            at: Date.now(),
+          });
+          return;
+        }
+
+        let finished = false;
+        const handleLine = (line: string) => {
+          if (!line.trim()) return;
+          const event = parseEvent(line);
+          if (!event) return;
+          if (event.type === "done" || event.type === "error") finished = true;
+          dispatch({ type: "event", event, at: Date.now() });
+        };
+
+        const reader = res.body
+          .pipeThrough(new TextDecoderStream())
+          .getReader();
+        let buffer = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += value;
+          // Events are one JSON object per line; keep any trailing partial line for the next chunk.
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          lines.forEach(handleLine);
+        }
+        handleLine(buffer); // the last line, in case the stream didn't end with a newline
+
+        if (!finished)
+          dispatch({
+            type: "fail",
+            message: "The stream ended before the chart finished.",
+            at: Date.now(),
+          });
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        dispatch({
+          type: "fail",
+          message: err instanceof Error ? err.message : "Connection lost.",
+          at: Date.now(),
+        });
       }
-
-      let finished = false;
-      const handleLine = (line: string) => {
-        if (!line.trim()) return;
-        const event = parseEvent(line);
-        if (!event) return;
-        if (event.type === "done" || event.type === "error") finished = true;
-        dispatch({ type: "event", event, at: Date.now() });
-      };
-
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buffer = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += value;
-        // Events are one JSON object per line; keep any trailing partial line for the next chunk.
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        lines.forEach(handleLine);
-      }
-      handleLine(buffer); // the last line, in case the stream didn't end with a newline
-
-      if (!finished) dispatch({ type: "fail", message: "The stream ended before the chart finished.", at: Date.now() });
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      dispatch({ type: "fail", message: err instanceof Error ? err.message : "Connection lost.", at: Date.now() });
-    }
-  }, []);
+    },
+    [],
+  );
 
   const cancel = useCallback(() => {
     controllerRef.current?.abort();

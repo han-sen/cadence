@@ -1,16 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import type { ChartEvent } from "@/lib/lineage/events";
 import { ChartError, streamChart } from "@/lib/lineage/stream-chart";
 import { clientKey, takeChartToken } from "@/lib/rate-limit";
 import { auth } from "@/lib/auth";
+import type { ChartEvent, RecordedEvent } from "@/lib/lineage/events";
+import type { SaveChartInput } from "@/lib/lineage/charts";
+import { db } from "@/db";
+import { chart, chartView } from "@/db/schema";
 
 const Body = z.object({
   artist: z.string().trim().min(1).max(200),
   title: z.string().trim().min(1).max(200),
+  mbid: z.uuid(),
 });
 
-// POST { artist, title } → newline-delimited JSON stream of ChartEvents.
+// POST { artist, title, mbid } → newline-delimited JSON stream of ChartEvents.
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
@@ -42,7 +46,12 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const startedAt = Date.now();
+      const recorded: RecordedEvent[] = [];
+
       const emit = (event: ChartEvent) => {
+        recorded.push({ offsetMs: Date.now() - startedAt, event });
+
         if (!request.signal.aborted)
           controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
       };
@@ -50,6 +59,11 @@ export async function POST(request: Request) {
         await streamChart(body.data.artist, body.data.title, {
           emit,
           signal: request.signal,
+        });
+        await saveChart({
+          ...body.data,
+          events: recorded,
+          userId: session.user.id,
         });
       } catch (err) {
         if (!request.signal.aborted) {
@@ -88,4 +102,33 @@ function errorMessage(err: unknown): string {
   if (err instanceof Anthropic.APIError)
     return `The model request failed (${err.status}).`;
   return "Something went wrong while making this chart.";
+}
+
+async function saveChart({
+  artist,
+  title,
+  mbid,
+  events,
+  userId,
+}: SaveChartInput): Promise<void> {
+  if (events[events.length - 1]?.event.type !== "done") return;
+
+  try {
+    const [saved] = await db
+      .insert(chart)
+      .values({
+        seedMbid: mbid,
+        title,
+        artist,
+        events,
+        createdBy: userId,
+      })
+      .returning({ id: chart.id });
+    await db.insert(chartView).values({
+      userId,
+      chartId: saved.id,
+    });
+  } catch (err) {
+    console.error("Saving the chart failed:", err);
+  }
 }

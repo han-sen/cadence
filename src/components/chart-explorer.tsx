@@ -63,7 +63,7 @@ export function ChartExplorer() {
                 onSelect={(album) => {
                   setPicked(album);
                   setActiveTrait(null);
-                  start(album.artist, album.title);
+                  start(album.artist, album.title, album.mbid);
                 }}
               />
               {isStreaming && (
