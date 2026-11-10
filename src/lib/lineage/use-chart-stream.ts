@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { z } from "zod";
+import { CHART_SOURCE_HEADER } from "./charts";
 import { ChartEvent } from "./events";
 import type { AlbumPick, Genre, LineageChart, Verification } from "./schema";
 
@@ -18,11 +19,14 @@ export type ChartState = {
   finishedAt?: number;
   usage?: { inputTokens: number; outputTokens: number };
   model?: string;
+  // True when the server is replaying a saved chart rather than making a new one.
+  isReplay?: boolean;
 };
 
 // Each action carries the time it happened, so the reducer stays pure: same input, same output.
 type Action =
   | { type: "start"; at: number }
+  | { type: "source"; isReplay: boolean; at: number }
   | { type: "event"; event: ChartEvent; at: number }
   | { type: "fail"; message: string; at: number }
   | { type: "cancel"; at: number };
@@ -34,6 +38,8 @@ function reducer(state: ChartState, action: Action): ChartState {
   switch (action.type) {
     case "start":
       return { ...initial, status: "streaming", startedAt: now };
+    case "source":
+      return { ...state, isReplay: action.isReplay };
     case "fail":
       return {
         ...state,
@@ -130,6 +136,11 @@ export function useChartStream() {
           });
           return;
         }
+        dispatch({
+          type: "source",
+          isReplay: res.headers.get(CHART_SOURCE_HEADER) === "replay",
+          at: Date.now(),
+        });
 
         let finished = false;
         const handleLine = (line: string) => {

@@ -115,7 +115,7 @@ export function ChartExplorer() {
                 {state.seed ? (
                   <TraitList traits={state.seed.traits} />
                 ) : (
-                  isStreaming && <ListeningLines />
+                  isStreaming && <WaitingLine isReplay={state.isReplay} />
                 )}
                 {/* Empty most of the time. A negative margin cancels its gap rather than hiding it,
                     because a hidden live region can miss announcing new text. */}
@@ -227,6 +227,24 @@ function seedProgress(state: ChartState): SeedProgress {
     finished:
       state.status !== "streaming" || state.albums.some((a) => a.check?.found),
   };
+}
+
+// What shows next to the seed cover until the traits arrive. Nothing until the server says
+// whether this is a new chart or a replay, so the wrong text never flashes up first.
+function WaitingLine({ isReplay }: { isReplay?: boolean }) {
+  if (isReplay === undefined) return null;
+  return isReplay ? <ReplayLine /> : <ListeningLines />;
+}
+
+// A replay only reads a saved chart, so it says that instead of the listening lines.
+function ReplayLine() {
+  return (
+    <p aria-live="polite" className="text-sm text-(--muted)">
+      <span className="animate-[fade-in_.5s_ease-out]">
+        Mapped before. Replaying the chart…
+      </span>
+    </p>
+  );
 }
 
 // Staged lines next to the seed cover until the traits replace them. They set the mood only:
