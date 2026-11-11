@@ -152,11 +152,14 @@ function GenreCard({
   return (
     <div
       data-genre-id={genre.id}
-      className={`${CARD} @container min-w-0 flex-1 ${emphasis ? "surface-blue bg-accent" : "bg-white"}`}
+      className={`${CARD} @container flex min-w-0 flex-1 flex-col ${emphasis ? "surface-blue bg-accent" : "bg-white"}`}
     >
       <GenreHeading genre={genre} genres={genres} />
       <GenreStatus albums={albums} />
-      <ul className={`grid overflow-hidden ${ALBUM_GRID}`}>
+      {/* A card can be stretched to match a taller one beside it. The list fills the extra
+          height and its rows stretch with it, so the dividers between albums (their borders)
+          run to the bottom of the card instead of stopping short. */}
+      <ul className={`grid flex-1 overflow-hidden ${ALBUM_GRID}`}>
         <AlbumCards
           albums={albums}
           coverClass="size-16 sm:size-22"

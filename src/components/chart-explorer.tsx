@@ -13,13 +13,14 @@ import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
 import { GradientBackdrop } from "./gradient-backdrop";
 import { DuotoneBackdrop } from "./duotone-backdrop";
+import { DemoGrid } from "./demo-grid";
 import { authClient } from "@/lib/auth-client";
 
 // The chart page: search, the seed header, the lineage as an hourglass (roots →
 // siblings → branches), then kindred picks from other genres. Everything fills in as the
 // stream arrives.
 export function ChartExplorer() {
-  const { state, start, cancel } = useChartStream();
+  const { state, start, play, cancel } = useChartStream();
   // The album picked in the search box. Shown straight away, so there's something on screen
   // during the ~20s before Claude's first result.
   const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
@@ -79,6 +80,17 @@ export function ChartExplorer() {
           </div>
           <ReadingKey />
         </div>
+
+        {/* Saved charts anyone can replay, until the first chart starts. */}
+        {state.status === "idle" && (
+          <DemoGrid
+            onPick={(demo) => {
+              setPicked(demo);
+              setActiveTrait(null);
+              play(demo.chartId);
+            }}
+          />
+        )}
 
         {picked && state.status !== "idle" && (
           <section

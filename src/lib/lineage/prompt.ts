@@ -21,6 +21,7 @@ Content (the recommendations):
 
 Accuracy:
 - Only recommend real, commercially released studio albums or EPs. Use the official title with no edition or remaster suffixes, and the artist name as credited.
+- Credit the name on the record itself: if an artist released it under an alias or group name, use that name, not the person behind it (Carl Craig's "Programmed" is credited to Innerzone Orchestra).
 - If you're not confident an album exists exactly as named, choose a different one.`;
 
 export const userMessage = (artist: string, title: string) => `Seed album: "${title}" by ${artist}`;
