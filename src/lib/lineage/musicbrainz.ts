@@ -95,7 +95,7 @@ const containsWords = (longer: string, shorter: string) =>
 // exact: same name, ignoring spacing ("Space Ape"/"Spaceape").
 // loose: a leader inside a group name either way round: "Horace Silver" / "The Horace Silver
 // Quintet", "Dinosaur Jr." / "Dinosaur".
-function artistMatch(wanted: string, creditedNames: string[]): "exact" | "loose" | null {
+export function artistMatch(wanted: string, creditedNames: string[]): "exact" | "loose" | null {
   const want = artistParts(wanted);
   const have = creditedNames.flatMap(artistParts);
   if (want.some((w) => have.some((h) => compact(w) === compact(h)))) return "exact";
@@ -125,7 +125,7 @@ function similarity(a: string, b: string): number {
   return (2 * shared) / (ga.length + gb.length);
 }
 
-function titleMatch(wanted: string, found: string): "exact" | "close" | null {
+export function titleMatch(wanted: string, found: string): "exact" | "close" | null {
   const w = titleKey(wanted);
   const f = titleKey(found);
   if (w === f) return "exact";
@@ -143,7 +143,7 @@ function titleMatch(wanted: string, found: string): "exact" | "close" | null {
 }
 
 // True if one insertion, deletion or substitution turns a into b (and they differ).
-function oneEditApart(a: string, b: string): boolean {
+export function oneEditApart(a: string, b: string): boolean {
   if (a === b || Math.abs(a.length - b.length) > 1) return false;
   const [s, l] = a.length <= b.length ? [a, b] : [b, a];
   let i = 0;
