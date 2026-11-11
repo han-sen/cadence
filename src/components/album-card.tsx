@@ -54,7 +54,9 @@ export function AlbumCard({
       <div className={WIDE}>
         <div className="flex gap-4">
           <Cover url={check.coverUrl} className={coverClass} />
-          <div className="flex flex-col justify-between">
+          {/* min-w-0 lets this column shrink beside the cover, and break-words wraps a word
+              too long for it (Moodymann's "Silentintroduction") instead of overflowing. */}
+          <div className="flex min-w-0 flex-col justify-between break-words">
             <div>
               <p className="text-lg leading-tight font-semibold tracking-tight">
                 {album.title}

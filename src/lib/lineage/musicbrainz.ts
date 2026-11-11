@@ -135,7 +135,22 @@ function titleMatch(wanted: string, found: string): "exact" | "close" | null {
   if (containsWords(longer, shorter)) return "close";
   // Near-identical spellings: "King Tubby Meets..." vs "King Tubbys Meets...".
   if (shorter.length >= 8 && similarity(w, f) >= 0.85) return "close";
+  // One letter added, dropped or changed, for titles too short for the check above: Mr.
+  // Fingers' "Ammnesia" asked for as "Amnesia". A close title only counts when the artist
+  // matches exactly, which keeps this from confirming a different record.
+  if (shorter.length >= 5 && oneEditApart(w, f)) return "close";
   return null;
+}
+
+// True if one insertion, deletion or substitution turns a into b (and they differ).
+function oneEditApart(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  let i = 0;
+  while (i < s.length && s[i] === l[i]) i++;
+  // Skip the first difference: one letter in each when the lengths match, one in the longer
+  // otherwise. The rest must then be identical.
+  return s.length === l.length ? s.slice(i + 1) === l.slice(i + 1) : s.slice(i) === l.slice(i + 1);
 }
 
 function escapeLucene(s: string): string {
