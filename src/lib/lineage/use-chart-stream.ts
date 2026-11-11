@@ -105,7 +105,8 @@ function parseEvent(line: string): ChartEvent | null {
   return result.data;
 }
 
-// Posts to /api/chart and folds the newline-delimited event stream into chart state.
+// Streams a chart into state: start() makes one for an album (or replays its saved chart), play()
+// replays a saved chart by id. Both read the same newline-delimited event stream.
 export function useChartStream() {
   const [state, dispatch] = useReducer(reducer, initial);
   const controllerRef = useRef<AbortController | null>(null);
@@ -113,20 +114,18 @@ export function useChartStream() {
   // If the component goes away mid-stream, stop the request so the server stops calling Claude.
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  const start = useCallback(
-    async (artist: string, title: string, mbid: string) => {
+  // The shared part of start() and play(). Each passes in a `send` function that makes its own
+  // fetch; run() stops any chart already streaming, calls send, then reads the response's
+  // events into state.
+  const run = useCallback(
+    async (send: (signal: AbortSignal) => Promise<Response>) => {
       controllerRef.current?.abort();
       const controller = new AbortController();
       controllerRef.current = controller;
       dispatch({ type: "start", at: Date.now() });
 
       try {
-        const res = await fetch("/api/chart", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artist, title, mbid }),
-          signal: controller.signal,
-        });
+        const res = await send(controller.signal);
         if (!res.ok || !res.body) {
           const body = await res.json().catch(() => null);
           dispatch({
@@ -184,10 +183,34 @@ export function useChartStream() {
     [],
   );
 
+  // Makes a chart for an album. Needs sign-in; the server replays the album's saved chart if it
+  // has one.
+  const start = useCallback(
+    (artist: string, title: string, mbid: string) =>
+      run((signal) =>
+        fetch("/api/chart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ artist, title, mbid }),
+          signal,
+        }),
+      ),
+    [run],
+  );
+
+  // Replays a saved chart by its id. Works signed out (the demo charts or shared charts).
+  const play = useCallback(
+    (chartId: string) =>
+      run((signal) =>
+        fetch(`/api/chart/${encodeURIComponent(chartId)}`, { signal }),
+      ),
+    [run],
+  );
+
   const cancel = useCallback(() => {
     controllerRef.current?.abort();
     dispatch({ type: "cancel", at: Date.now() });
   }, []);
 
-  return { state, start, cancel };
+  return { state, start, play, cancel };
 }
