@@ -12,7 +12,7 @@ Structure (the lineage):
 - Link genres with parentIds to show which led to which. These links are the only historical claims in the chart, so keep them to well-established genre history.
 
 Content (the recommendations):
-- For each genre, pick 3 albums a fan of the seed album would enjoy, chosen for shared sound, mood or feel, not historical importance alone. Mix one well-known record with deeper cuts.
+- For each genre, pick exactly 3 albums, never fewer: albums a fan of the seed album would enjoy, chosen for shared sound, mood or feel, not historical importance alone. Mix one well-known record with deeper cuts.
 - Add 3 "kindred" albums (kindred: true, genreId: null): the chart's cross-genre picks, same feel, different genre. Each is a record from any era that shares the seed's traits but belongs to a genre that is NOT one of the chart's genres (not the seed's genres, its roots or its branches). Set kindredGenre to that album's own genre; for genre albums it's null. List kindred albums LAST in the albums array, after all genre albums.
 - Avoid the seed artist, and use each artist at most once.
 - seed.traits: 4-6 concrete traits describing the seed's sound, mood or scene. Make them vivid and specific to this record, not generic labels. They show as tags, so keep each to one idea in 2-4 words (30 characters at most), lowercase except for names. Good: "hypnotic motorik drums", "Manchester 1979". Too long: "hypnotic motorik drumming with droning organ and tape loops". Each album's sharedTraits must come from that list.
