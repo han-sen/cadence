@@ -4,11 +4,8 @@ import { ChartError, streamChart } from "@/lib/lineage/stream-chart";
 import { clientKey, takeChartToken } from "@/lib/rate-limit";
 import { auth } from "@/lib/auth";
 import type { ChartEvent, RecordedEvent } from "@/lib/lineage/events";
-import {
-  CHART_SOURCE_HEADER,
-  replayChart,
-  type SaveChartInput,
-} from "@/lib/lineage/charts";
+import { replayChart, type SaveChartInput } from "@/lib/lineage/charts";
+import { chartStreamResponse } from "@/lib/lineage/chart-response";
 import { db } from "@/db";
 import { chart, chartView } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -54,61 +51,41 @@ export async function POST(request: Request) {
     }
   }
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      // The server holds the response headers until the first chunk. An empty line (which the
-      // client skips) sends them now, so the page learns live vs replay before the first event.
-      controller.enqueue(encoder.encode("\n"));
+  return chartStreamResponse({
+    signal: request.signal,
+    source: existing ? "replay" : "live",
+    run: async (send) => {
+      if (existing) {
+        // The album was charted before: replay that chart instead of calling Claude.
+        await recordView(session.user.id, existing.id);
+        await replayChart(existing.events, send, request.signal);
+        return;
+      }
 
+      // Sends each event and records it with its time, so the finished chart can be saved.
       const startedAt = Date.now();
       const recorded: RecordedEvent[] = [];
-
       const emit = (event: ChartEvent) => {
         recorded.push({ offsetMs: Date.now() - startedAt, event });
-
-        if (!request.signal.aborted)
-          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        send(event);
       };
-      try {
-        if (existing) {
-          // The album was charted before: replay that chart instead of calling Claude.
-          await recordView(session.user.id, existing.id);
-          await replayChart(existing.events, emit, request.signal);
-        } else {
-          await streamChart(body.data.artist, body.data.title, {
-            emit,
-            signal: request.signal,
-          });
-          await saveChart({
-            ...body.data,
-            events: recorded,
-            userId: session.user.id,
-          });
-        }
-      } catch (err) {
-        if (!request.signal.aborted) {
-          console.error(
-            `Chart failed for "${body.data.title}" by ${body.data.artist}:`,
-            err,
-          );
-          emit({ type: "error", message: errorMessage(err) });
-        }
-      } finally {
-        try {
-          controller.close();
-        } catch {
-          // Already closed because the client went away.
-        }
-      }
-    },
-  });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-store",
-      [CHART_SOURCE_HEADER]: existing ? "replay" : "live",
+      await streamChart(body.data.artist, body.data.title, {
+        emit,
+        signal: request.signal,
+      });
+      await saveChart({
+        ...body.data,
+        events: recorded,
+        userId: session.user.id,
+      });
+    },
+    onError: (err) => {
+      console.error(
+        `Chart failed for "${body.data.title}" by ${body.data.artist}:`,
+        err,
+      );
+      return errorMessage(err);
     },
   });
 }
