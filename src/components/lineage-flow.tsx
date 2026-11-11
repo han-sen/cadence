@@ -128,14 +128,13 @@ function GenreHeading({ genre, genres }: { genre: Genre; genres: Genre[] }) {
 
 const CARD = "overflow-hidden rounded-[28px]";
 
-// Album grids inside a genre card.
-// Siblings sit side by side in one wide card, so their albums fill a single row.
-const ROW_GRID = "grid-cols-[repeat(auto-fit,minmax(240px,1fr))]";
-// Roots and branches stack their genre cards, so each card is narrower: two columns when it
-// has room, and an odd last album spans both, so its top line runs the full width (at that
-// width the album card lays out side by side).
-const STACK_GRID =
-  "grid-cols-1 @[420px]:grid-cols-2 [&>li:last-child:nth-child(odd)]:col-span-full";
+// Album grid inside a genre card, sized by the card's width: one row of three once the card
+// has room (a genre alone in its tier, usually), two columns when narrower (genres side by
+// side, tablets) with an odd last album spanning both, so its top line runs the full width
+// (at that width the album card lays out side by side), and one column on phones.
+const ALBUM_GRID =
+  "grid-cols-1 @[420px]:grid-cols-2 [&>li:last-child:nth-child(odd)]:col-span-full " +
+  "@[760px]:grid-cols-[repeat(auto-fit,minmax(240px,1fr))] @[760px]:[&>li:last-child:nth-child(odd)]:col-span-1";
 
 // A genre with its albums, all open. Every tier uses it; siblings (the hourglass's
 // waist) gets a slightly brighter fill via `emphasis`.
@@ -157,9 +156,7 @@ function GenreCard({
     >
       <GenreHeading genre={genre} genres={genres} />
       <GenreStatus albums={albums} />
-      <ul
-        className={`grid overflow-hidden ${emphasis ? ROW_GRID : STACK_GRID}`}
-      >
+      <ul className={`grid overflow-hidden ${ALBUM_GRID}`}>
         <AlbumCards
           albums={albums}
           coverClass="size-16 sm:size-22"

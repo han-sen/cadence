@@ -29,9 +29,12 @@ const cardFrame = (isStandalone: boolean) =>
 
 // Full album card: cover and title, then "why", links and shared traits. Stacked in a narrow
 // card; once the card is 400px wide (an odd last album spanning its genre card, say) the
-// second part moves beside the first. `coverClass` sets the cover size, e.g. "size-18".
+// second part moves beside the first. Wider still (a lone album filling a genre card), the
+// first part stops growing at 20rem, so "why" sits next to the title instead of past the
+// middle. `coverClass` sets the cover size, e.g. "size-18".
 const WIDE =
-  "@[400px]:grid @[400px]:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] @[400px]:gap-x-8";
+  "@[400px]:grid @[400px]:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] @[400px]:gap-x-8 " +
+  "@[640px]:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]";
 export function AlbumCard({
   album,
   check,
@@ -69,7 +72,7 @@ export function AlbumCard({
           </div>
         </div>
         <div>
-          <p className="mt-4 text-sm leading-snug text-(--muted) @[400px]:mt-0">
+          <p className="mt-4 max-w-[60ch] text-sm leading-snug text-(--muted) @[400px]:mt-0">
             {album.why}
           </p>
           <AlbumLinks artist={album.artist} title={album.title} />
