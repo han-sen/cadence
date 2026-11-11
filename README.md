@@ -1,6 +1,6 @@
-# Lineage
+# Cadence
 
-Name an album you love. Lineage maps where it sits in music history (the genres it grew out of and the ones it led to) and recommends albums along that path, each with a short note on why you'd like it.
+Name an album you love. Cadence maps where it sits in music history (the genres it grew out of and the ones it led to) and recommends albums along that path, each with a short note on why you'd like it.
 
 ## How it works
 

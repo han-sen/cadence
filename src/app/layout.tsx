@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lineage",
+  title: "Cadence",
   description: "Map an album's genre lineage and find what to listen to next.",
 };
 

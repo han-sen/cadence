@@ -2,7 +2,7 @@ import type { AlbumSuggestion, Verification } from "./schema";
 
 // MusicBrainz asks for an identifying User-Agent and at most 1 request per second.
 // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
-const USER_AGENT = `Lineage/0.1 ( ${process.env.MB_CONTACT ?? "lineage-app"} )`;
+const USER_AGENT = `Cadence/0.1 ( ${process.env.MB_CONTACT ?? "cadence-app"} )`;
 const MIN_INTERVAL_MS = 1100;
 const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000];
 
