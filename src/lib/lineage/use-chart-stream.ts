@@ -29,7 +29,8 @@ type Action =
   | { type: "source"; isReplay: boolean; at: number }
   | { type: "event"; event: ChartEvent; at: number }
   | { type: "fail"; message: string; at: number }
-  | { type: "cancel"; at: number };
+  | { type: "cancel"; at: number }
+  | { type: "reset"; at: number };
 
 const initial: ChartState = { status: "idle", genres: [], albums: [] };
 
@@ -47,6 +48,8 @@ function reducer(state: ChartState, action: Action): ChartState {
         error: action.message,
         finishedAt: now,
       };
+    case "reset":
+      return initial;
     case "cancel":
       return state.status === "streaming"
         ? { ...state, status: "cancelled", finishedAt: now }
@@ -212,5 +215,11 @@ export function useChartStream() {
     dispatch({ type: "cancel", at: Date.now() });
   }, []);
 
-  return { state, start, play, cancel };
+  // Back to the empty page: stops any chart still streaming and clears the last one.
+  const reset = useCallback(() => {
+    controllerRef.current?.abort();
+    dispatch({ type: "reset", at: Date.now() });
+  }, []);
+
+  return { state, start, play, cancel, reset };
 }

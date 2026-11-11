@@ -14,13 +14,14 @@ import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
 import { GradientBackdrop } from "./gradient-backdrop";
 import { DuotoneBackdrop } from "./duotone-backdrop";
 import { DemoGrid } from "./demo-grid";
+import { HOME_RESET_EVENT } from "./home-link";
 import { authClient } from "@/lib/auth-client";
 
 // The chart page: search, the seed header, the lineage as an hourglass (roots →
 // siblings → branches), then kindred picks from other genres. Everything fills in as the
 // stream arrives.
 export function ChartExplorer() {
-  const { state, start, play, cancel } = useChartStream();
+  const { state, start, play, cancel, reset } = useChartStream();
   // The album picked in the search box. Shown straight away, so there's something on screen
   // during the ~20s before Claude's first result.
   const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
@@ -30,6 +31,17 @@ export function ChartExplorer() {
   // loading, the box stays disabled too, so it can't be used a moment before it's allowed.
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const signedOut = !sessionPending && !session;
+
+  // The wordmark, clicked while already here, clears the chart and brings back the demo grid.
+  useEffect(() => {
+    const onReset = () => {
+      reset();
+      setPicked(null);
+      setActiveTrait(null);
+    };
+    window.addEventListener(HOME_RESET_EVENT, onReset);
+    return () => window.removeEventListener(HOME_RESET_EVENT, onReset);
+  }, [reset]);
 
   // Clicking the active trait again clears it.
   const traitContext = useMemo(
