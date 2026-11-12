@@ -2,14 +2,23 @@
 
 import { useState } from "react";
 
-const BOX = "shrink-0 rounded-md bg-(--chip)";
+const BOX = "shrink-0 bg-(--chip)";
 
 // Covers come from the Cover Art Archive via two redirects into archive.org, so they can take a
 // few seconds and occasionally fail. Pulses while loading, retries once, and shows a distinct
 // "no cover" square if it still fails (or the archive has no art for this album).
 // alt="" because the title and artist are always shown next to it; a screen reader would only
-// repeat them. `className` sets the size, e.g. "size-16".
-export function Cover({ url, className }: { url: string; className: string }) {
+// repeat them. `className` sets the size, e.g. "size-16". `rounded` sets the corners; it's a
+// separate prop because two rounded-* classes on one element don't override each other by order.
+export function Cover({
+  url,
+  className,
+  rounded = "rounded-md",
+}: {
+  url: string;
+  className: string;
+  rounded?: string;
+}) {
   const [status, setStatus] = useState<"loading" | "loaded" | "missing">("loading");
   const [attempt, setAttempt] = useState(0);
 
@@ -24,13 +33,13 @@ export function Cover({ url, className }: { url: string; className: string }) {
 
   if (status === "missing") {
     return (
-      <div aria-hidden className={`${BOX} ${className} grid place-items-center text-(--faint)`}>
+      <div aria-hidden className={`${BOX} ${rounded} ${className} grid place-items-center text-(--faint)`}>
         ♪
       </div>
     );
   }
   return (
-    <div className={`${BOX} ${className} overflow-hidden ${status === "loading" ? "animate-pulse" : ""}`}>
+    <div className={`${BOX} ${rounded} ${className} overflow-hidden ${status === "loading" ? "animate-pulse" : ""}`}>
       {/* Plain <img>: small thumbnails from an external archive, so Next's image optimizer
           would add a server round trip for little gain. The query string on a retry stops the
           browser from reusing the failed response. */}
@@ -48,6 +57,6 @@ export function Cover({ url, className }: { url: string; className: string }) {
 }
 
 // Same footprint as a cover, for content that hasn't arrived yet.
-export function CoverPlaceholder({ className }: { className: string }) {
-  return <div aria-hidden className={`${BOX} ${className}`} />;
+export function CoverPlaceholder({ className, rounded = "rounded-md" }: { className: string; rounded?: string }) {
+  return <div aria-hidden className={`${BOX} ${rounded} ${className}`} />;
 }

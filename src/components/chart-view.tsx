@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { AlbumSuggestion } from "@/lib/lineage/schema";
 import {
@@ -7,41 +8,44 @@ import {
   useChartStream,
 } from "@/lib/lineage/use-chart-stream";
 import { AlbumCards, isRejected } from "./album-card";
-import { AlbumSearch } from "./album-search";
 import { LineageFlow, SectionLabel } from "./lineage-flow";
 import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
 import { GradientBackdrop } from "./gradient-backdrop";
 import { DuotoneBackdrop } from "./duotone-backdrop";
-import { DemoGrid } from "./demo-grid";
-import { HOME_RESET_EVENT } from "./home-link";
 import { authClient } from "@/lib/auth-client";
 
-// The chart page: search, the seed header, the lineage as an hourglass (roots →
-// siblings → branches), then kindred picks from other genres. Everything fills in as the
-// stream arrives.
-export function ChartExplorer() {
-  const { state, start, play, cancel, reset } = useChartStream();
-  // The album picked in the search box. Shown straight away, so there's something on screen
-  // during the ~20s before Claude's first result.
-  const [picked, setPicked] = useState<AlbumSuggestion | null>(null);
+// One album's chart page: the seed header, the lineage as an hourglass (roots → siblings →
+// branches), then kindred picks from other genres. Everything fills in as the stream arrives.
+// With a `chartId`, it replays that saved chart, for anyone. Without one, it makes the chart
+// fresh, which needs sign-in.
+export function ChartView({
+  album,
+  chartId,
+}: {
+  album: AlbumSuggestion;
+  chartId?: string;
+}) {
+  const { state, start, play, cancel } = useChartStream();
   const [activeTrait, setActiveTrait] = useState<string | null>(null);
   const isStreaming = state.status === "streaming";
-  // Search needs a session (the API returns 401 without one). While the session is still
-  // loading, the box stays disabled too, so it can't be used a moment before it's allowed.
   const { data: session, isPending: sessionPending } = authClient.useSession();
-  const signedOut = !sessionPending && !session;
 
-  // The wordmark, clicked while already here, clears the chart and brings back the demo grid.
+  // What the page can do. A replay doesn't depend on the session, so a session that finishes
+  // loading (or refreshes) mid-replay can't restart it.
+  const mode = chartId
+    ? "replay"
+    : session
+      ? "make"
+      : sessionPending
+        ? "waiting"
+        : "signed-out";
+  const { artist, title, mbid } = album;
+
   useEffect(() => {
-    const onReset = () => {
-      reset();
-      setPicked(null);
-      setActiveTrait(null);
-    };
-    window.addEventListener(HOME_RESET_EVENT, onReset);
-    return () => window.removeEventListener(HOME_RESET_EVENT, onReset);
-  }, [reset]);
+    if (mode === "replay" && chartId) play(chartId);
+    else if (mode === "make") start(artist, title, mbid);
+  }, [mode, chartId, artist, title, mbid, play, start]);
 
   // Clicking the active trait again clears it.
   const traitContext = useMemo(
@@ -52,6 +56,7 @@ export function ChartExplorer() {
     }),
     [activeTrait],
   );
+
   const matching = activeTrait
     ? state.albums.filter(
         (a) => a.check?.found && sharesTrait(a.album, activeTrait),
@@ -62,110 +67,90 @@ export function ChartExplorer() {
   return (
     <ActiveTrait value={traitContext}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 pt-2 pb-6 sm:gap-5 sm:pt-4 sm:pb-10">
-        {/* Bento top row: the pitch and search on a white card, the reading key on a blue dot tile. */}
-        <div className="grid gap-4 sm:gap-5 lg:grid-cols-[2fr_1fr]">
-          <div className="flex flex-col justify-between gap-6 rounded-[32px] bg-white p-6 sm:p-8">
-            <h2 className="display max-w-xl text-3xl sm:text-4xl">
-              Name an album you love. See where it came from, where it led, and
-              what to play next.
-            </h2>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <AlbumSearch
-                isDisabled={isStreaming || !session}
-                placeholder={signedOut ? "Sign in to pick an album" : undefined}
-                onSelect={(album) => {
-                  setPicked(album);
-                  setActiveTrait(null);
-                  start(album.artist, album.title, album.mbid);
-                }}
-              />
-              {isStreaming && (
+        <Link
+          href="/"
+          className="meta self-start text-(--muted) hover:text-(--ink)"
+        >
+          ← Chart another album
+        </Link>
+
+        <section
+          aria-label="Seed album"
+          className="surface-blue relative isolate animate-[fade-in_.4s_ease-out] overflow-hidden rounded-[32px] bg-accent p-6 motion-reduce:animate-none sm:p-8"
+        >
+          <DuotoneBackdrop coverUrl={album.coverUrl} />
+          <div className="meta mb-6 flex justify-between gap-4 text-(--muted)">
+            <span>Seed album</span>
+            {isStreaming ? (
+              <span>
+                Mapping… ·{" "}
                 <button
                   type="button"
                   onClick={cancel}
-                  className="h-14 rounded-full border border-(--line) px-6 text-sm font-semibold uppercase hover:bg-(--chip)"
+                  className="underline underline-offset-2 hover:text-(--ink)"
                 >
                   Cancel
                 </button>
+              </span>
+            ) : (
+              state.status === "done" && <span>Mapped</span>
+            )}
+          </div>
+          <div className="flex gap-5 sm:gap-8">
+            {/* Keyed by the run, so a new run of the chart restarts the sequence. */}
+            <SeedLoader
+              key={state.startedAt}
+              coverUrl={album.coverUrl}
+              progress={seedProgress(state)}
+              className="size-32 sm:size-60"
+            />
+            {/* Stretches to the cover's height, so the status line can sit level with its bottom edge. */}
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              <h2 className="display text-3xl break-words sm:text-6xl">
+                {album.title}
+              </h2>
+              <p className="text-lg font-medium sm:text-xl">
+                {album.artist}
+                {album.year && (
+                  <span className="font-normal text-(--muted)">
+                    , {album.year}
+                  </span>
+                )}
+              </p>
+
+              {state.seed ? (
+                <TraitList traits={state.seed.traits} />
+              ) : mode === "signed-out" ? (
+                <p className="text-sm text-(--muted)">
+                  This album hasn&apos;t been charted yet. Sign in to chart it.
+                </p>
+              ) : (
+                isStreaming && <WaitingLine isReplay={state.isReplay} />
               )}
+              {/* Empty most of the time. A negative margin cancels its gap rather than hiding it,
+                  because a hidden live region can miss announcing new text. */}
+              <p
+                aria-live="polite"
+                className="text-sm text-(--muted) empty:-mt-3"
+              >
+                {activeTrait && (
+                  <>
+                    {matching}{" "}
+                    {matching === 1 ? "album shares" : "albums share"} “
+                    {activeTrait}” ·{" "}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTrait(null)}
+                      className="underline underline-offset-2 hover:text-(--ink)"
+                    >
+                      Clear
+                    </button>
+                  </>
+                )}
+              </p>
             </div>
           </div>
-          <ReadingKey />
-        </div>
-
-        {/* Saved charts anyone can replay, until the first chart starts. */}
-        {state.status === "idle" && (
-          <DemoGrid
-            onPick={(demo) => {
-              setPicked(demo);
-              setActiveTrait(null);
-              play(demo.chartId);
-            }}
-          />
-        )}
-
-        {picked && state.status !== "idle" && (
-          <section
-            aria-label="Seed album"
-            className="surface-blue relative isolate overflow-hidden rounded-[32px] bg-accent p-6 sm:p-8"
-          >
-            <DuotoneBackdrop coverUrl={picked.coverUrl} />
-            <div className="meta mb-6 flex justify-between text-(--muted)">
-              <span>Seed album</span>
-              <span>{isStreaming ? "Mapping…" : "Mapped"}</span>
-            </div>
-            <div className="flex gap-5 sm:gap-8">
-              {/* Keyed by the run, so picking an album again replays the sequence. */}
-              <SeedLoader
-                key={state.startedAt}
-                coverUrl={picked.coverUrl}
-                progress={seedProgress(state)}
-                className="size-32 sm:size-60"
-              />
-              {/* Stretches to the cover's height, so the status line can sit level with its bottom edge. */}
-              <div className="flex min-w-0 flex-1 flex-col gap-3">
-                <h2 className="display text-3xl break-words sm:text-6xl">
-                  {picked.title}
-                </h2>
-                <p className="text-lg font-medium sm:text-xl">
-                  {picked.artist}
-                  {picked.year && (
-                    <span className="font-normal text-(--muted)">
-                      , {picked.year}
-                    </span>
-                  )}
-                </p>
-
-                {state.seed ? (
-                  <TraitList traits={state.seed.traits} />
-                ) : (
-                  isStreaming && <WaitingLine isReplay={state.isReplay} />
-                )}
-                {/* Empty most of the time. A negative margin cancels its gap rather than hiding it,
-                    because a hidden live region can miss announcing new text. */}
-                <p
-                  aria-live="polite"
-                  className="text-sm text-(--muted) empty:-mt-3"
-                >
-                  {activeTrait && (
-                    <>
-                      {matching}{" "}
-                      {matching === 1 ? "album shares" : "albums share"} “
-                      {activeTrait}” ·{" "}
-                      <button
-                        type="button"
-                        onClick={() => setActiveTrait(null)}
-                        className="underline underline-offset-2 hover:text-(--ink)"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
+        </section>
 
         {state.genres.length > 0 && (
           <div className="mt-8">
@@ -298,37 +283,5 @@ function ListeningLines() {
         {LISTENING[line]}
       </span>
     </p>
-  );
-}
-
-// How to read a chart: the page's sections in order, on the blue dot tile next to the header.
-// Their names and hints match the section labels further down.
-const SECTIONS = [
-  ["Roots", "Where it came from"],
-  ["Siblings", "Same scene"],
-  ["Branches", "Where it led"],
-  ["Kindred", "Same feel, different genre"],
-];
-
-function ReadingKey() {
-  return (
-    <aside
-      aria-label="How to read a chart"
-      className="surface-blue relative isolate hidden flex-col justify-between gap-6 overflow-hidden rounded-[32px] bg-accent p-6 sm:flex sm:p-8"
-    >
-      <div aria-hidden className="dots absolute inset-0 -z-10" />
-      <h2 className="meta text-(--muted)">How to read a chart</h2>
-      <ol className="flex flex-col gap-4">
-        {SECTIONS.map(([name, hint], i) => (
-          <li key={name} className="flex items-baseline gap-4">
-            <span className="meta w-5 shrink-0 text-(--faint)">0{i + 1}</span>
-            <span>
-              <span className="display block text-2xl">{name}</span>
-              <span className="text-sm text-(--muted)">{hint}</span>
-            </span>
-          </li>
-        ))}
-      </ol>
-    </aside>
   );
 }

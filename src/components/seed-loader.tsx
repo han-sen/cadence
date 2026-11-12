@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createHalftone, loadCoverForWebGL } from "@/lib/halftone";
 import { Cover } from "./cover";
 
@@ -36,18 +36,24 @@ const CREEP_TAU_S = 4;
 // Search results use the 250px thumbnails; the seed is drawn larger, so ask for 500px.
 export const largeCover = (url: string) => url.replace(/front-250$/, "front-500");
 
+// Checked once per page load and remembered: the probe creates a WebGL context, which is costly.
+let animationSupported: boolean | undefined;
 function canAnimate() {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
-  const probe = document.createElement("canvas").getContext("webgl");
-  probe?.getExtension("WEBGL_lose_context")?.loseContext();
-  return probe !== null;
+  if (animationSupported === undefined) {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const probe = reduced ? null : document.createElement("canvas").getContext("webgl");
+    probe?.getExtension("WEBGL_lose_context")?.loseContext();
+    animationSupported = probe !== null;
+  }
+  return animationSupported;
 }
+const neverChanges = () => () => {};
 
 export function SeedLoader({ coverUrl, progress, className }: { coverUrl: string; progress: SeedProgress; className: string }) {
-  // Decided once on mount. This component only mounts after the user picks an album, so it
-  // never renders on the server.
-  const [animate] = useState(canAnimate);
+  // A chart page opened directly renders on the server first, where there's no window to check.
+  // The server and the browser's first render both show the plain cover (the third argument),
+  // so they match; the browser then switches to the animation if it can run it.
+  const animate = useSyncExternalStore(neverChanges, canAnimate, () => false);
   if (!animate) return <Cover url={coverUrl} className={className} />;
   return <AnimatedSeed coverUrl={largeCover(coverUrl)} progress={progress} className={className} />;
 }

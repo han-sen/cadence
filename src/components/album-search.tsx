@@ -120,7 +120,7 @@ export function AlbumSearch({
             <ListBoxItem
               id={album.mbid}
               textValue={label(album)}
-              className="flex cursor-default items-center gap-3 rounded-2xl px-3 py-2 outline-none data-focused:bg-accent/10"
+              className="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 outline-none data-focused:bg-accent/10"
             >
               <Cover url={album.coverUrl} className="size-10" />
               <span className="flex min-w-0 flex-col">

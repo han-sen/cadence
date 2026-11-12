@@ -15,7 +15,7 @@ Key files:
 - `src/lib/lineage/stream-chart.ts`: streaming, partial-JSON parsing, event emission
 - `src/lib/lineage/musicbrainz.ts`: rate-limited album lookup and matching
 - `src/app/api/chart/route.ts`: the API route (input validation, rate limiting, error handling)
-- `src/components/chart-explorer.tsx`: the UI
+- `src/components/home-view.tsx` and `src/components/chart-view.tsx`: the home page and an album's chart page
 
 ## Setup
 

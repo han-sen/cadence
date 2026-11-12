@@ -1,4 +1,4 @@
-import { HomeLink } from "./home-link";
+import Link from "next/link";
 import { AuthButton } from "./auth-button";
 
 // The app bar on every page: the wordmark on the left, sign-in or the signed-in user on the
@@ -10,7 +10,7 @@ export function SiteHeader() {
         {/* The page's main heading. Placeholder text until there's a logo (keep the h1 and give
             the logo alt text "Cadence"). */}
         <h1 className="display text-2xl">
-          <HomeLink>Cadence</HomeLink>
+          <Link href="/">Cadence</Link>
         </h1>
         <AuthButton />
       </div>
