@@ -8,7 +8,7 @@ import { replayChart, type SaveChartInput } from "@/lib/lineage/charts";
 import { chartStreamResponse } from "@/lib/lineage/chart-response";
 import { db } from "@/db";
 import { chart, chartView } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { findCanonicalChart } from "@/db/queries";
 
 const Body = z.object({
   artist: z.string().trim().min(1).max(200),
@@ -138,22 +138,5 @@ async function recordView(userId: string, chartId: string) {
     await db.insert(chartView).values({ userId, chartId });
   } catch (err) {
     console.error(`Recording a view of chart ${chartId} failed:`, err);
-  }
-}
-
-// The album's canonical chart: its newest one, or undefined if it has never been charted.
-async function findCanonicalChart(mbid: string) {
-  try {
-    const [savedChart] = await db
-      .select()
-      .from(chart)
-      .where(eq(chart.seedMbid, mbid))
-      .orderBy(desc(chart.createdAt))
-      .limit(1);
-
-    // On a database error, returns undefined, so the route generates a fresh chart instead.
-    return savedChart;
-  } catch (err) {
-    console.error(`Looking up the chart for ${mbid} failed:`, err);
   }
 }

@@ -1,9 +1,7 @@
 import { z } from "zod";
-import { db } from "@/db";
-import { chart } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { replayChart } from "@/lib/lineage/charts";
 import { chartStreamResponse } from "@/lib/lineage/chart-response";
+import { findByChartId } from "@/db/queries";
 
 // GET /api/chart/[id] → a saved chart, replayed as the same NDJSON stream POST sends.
 // Public, so the demo grid works signed out. No rate limit, since it never calls Claude, and no
@@ -36,14 +34,4 @@ export async function GET(
       return "Something went wrong loading this chart.";
     },
   });
-}
-
-async function findByChartId(id: string) {
-  const [savedChart] = await db
-    .select()
-    .from(chart)
-    .where(eq(chart.id, id))
-    .limit(1);
-
-  return savedChart;
 }
