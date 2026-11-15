@@ -8,7 +8,7 @@ Checks whether Claude's lineage charts are worth building a UI for. For each see
 
 ## Setup
 
-It uses the app's dependencies and API key, so from the repo root: run `npm install` and create `.env.local` with `ANTHROPIC_API_KEY=sk-ant-...` (see the root README).
+It uses the app's dependencies and API key, so from the repo root: run `npm install` and create `.env.local` from `.env.example` (see the root README; the script only needs `ANTHROPIC_API_KEY`).
 
 The prompt, schema and MusicBrainz matcher live in `../src/lib/lineage/` and are shared with the app.
 
