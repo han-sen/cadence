@@ -219,8 +219,10 @@ const yearOf = (rg: ReleaseGroup) => {
   const date = rg["first-release-date"];
   return date ? Number(date.slice(0, 4)) : null;
 };
-const coverUrlOf = (rg: ReleaseGroup) =>
-  `https://coverartarchive.org/release-group/${rg.id}/front-250`;
+// An album's cover from the Cover Art Archive, as a 250px thumbnail.
+export const coverUrl = (mbid: string) =>
+  `https://coverartarchive.org/release-group/${mbid}/front-250`;
+const coverUrlOf = (rg: ReleaseGroup) => coverUrl(rg.id);
 
 const creditedAs = (rg: ReleaseGroup) =>
   (rg["artist-credit"] ?? [])

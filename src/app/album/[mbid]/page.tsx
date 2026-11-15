@@ -1,17 +1,62 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
+import { z } from "zod";
 import { ChartView } from "@/components/chart-view";
-import { DEMO_CHARTS } from "@/lib/lineage/demo-charts";
+import { findCanonicalChart } from "@/db/queries";
+import { coverUrl, getAlbum } from "@/lib/lineage/musicbrainz";
+import type { AlbumSuggestion } from "@/lib/lineage/schema";
 
-// STAND-IN until the real page exists: it only knows the six demo albums, so the home-to-chart
-// flow can be tried before the database lookups are written. Any other album is a 404 for now.
-//
-// The real page replaces the demo lookup below with:
-//   1. The album's canonical (newest) saved chart, if it has one. Demo albums are covered by
-//      this too: each album only ever has one chart, since the chart route replays an existing
-//      chart instead of making a new one.
-//   2. Otherwise the album's details from MusicBrainz, with no chart id (signed in, it gets made).
-// Plus generateMetadata, for the page title and the cover as the link preview image.
+// An album's chart page, at /album/<MusicBrainz release group id>. If the album has a saved
+// chart, anyone can watch it replay. If not, a signed-in visitor gets one made.
+
+type AlbumPageData = { album: AlbumSuggestion; chartId?: string };
+
+// What the page needs for an album, or null if there's no such album. Wrapped in React's
+// cache() so the page and generateMetadata share one lookup per request.
+const loadAlbum = cache(async (mbid: string): Promise<AlbumPageData | null> => {
+  if (!z.uuid().safeParse(mbid).success) return null;
+
+  // A charted album: its details come from the saved chart, so MusicBrainz isn't asked.
+  const chart = await findCanonicalChart(mbid);
+  if (chart) {
+    // The year isn't a column. It's in the chart's seed event, as Claude gave it.
+    const seed = chart.events.find((e) => e.event.type === "seed")?.event;
+    return {
+      chartId: chart.id,
+      album: {
+        mbid,
+        artist: chart.artist,
+        title: chart.title,
+        year: seed?.type === "seed" ? seed.seed.year : null,
+        type: "Album",
+        coverUrl: coverUrl(mbid),
+      },
+    };
+  }
+
+  // Never charted: MusicBrainz has the album's details, if the id is a real album.
+  const album = await getAlbum(mbid);
+  return album ? { album } : null;
+});
+
+// The page title, and the cover as the image shown when the link is shared.
+export async function generateMetadata({
+  params,
+}: PageProps<"/album/[mbid]">): Promise<Metadata> {
+  const { mbid } = await params;
+  const data = await loadAlbum(mbid);
+  if (!data) return { title: "Album not found · Cadence" };
+
+  const { album } = data;
+  const title = `${album.title} by ${album.artist} · Cadence`;
+  const description = `Where ${album.title} came from, where it led, and what to play next.`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, images: [album.coverUrl] },
+  };
+}
 
 // Not async: under cacheComponents a route param is request-time data, so it's read inside
 // the Suspense boundary below rather than at the top of the page.
@@ -25,11 +70,15 @@ export default function AlbumPage({ params }: PageProps<"/album/[mbid]">) {
   );
 }
 
-async function AlbumChart({ params }: { params: PageProps<"/album/[mbid]">["params"] }) {
+async function AlbumChart({
+  params,
+}: {
+  params: PageProps<"/album/[mbid]">["params"];
+}) {
   const { mbid } = await params;
-  const demo = DEMO_CHARTS.find((d) => d.mbid === mbid);
-  if (!demo) notFound();
+  const data = await loadAlbum(mbid);
+  if (!data) notFound();
 
-  const { chartId, ...album } = demo;
-  return <ChartView key={mbid} album={album} chartId={chartId} />;
+  // Keyed by album, so going from one chart to another starts a fresh view.
+  return <ChartView key={mbid} album={data.album} chartId={data.chartId} />;
 }

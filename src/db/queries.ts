@@ -4,6 +4,8 @@ import { chart } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 // The album's canonical chart: its newest one, or undefined if it has never been charted.
+// A database error is logged and also returns undefined, so callers carry on as if the album
+// had no chart: the chart route makes a fresh one, and the album page offers to.
 export async function findCanonicalChart(mbid: string) {
   try {
     const [savedChart] = await db
@@ -13,7 +15,6 @@ export async function findCanonicalChart(mbid: string) {
       .orderBy(desc(chart.createdAt))
       .limit(1);
 
-    // On a database error, returns undefined, so the route generates a fresh chart instead.
     return savedChart;
   } catch (err) {
     console.error(`Looking up the chart for ${mbid} failed:`, err);
