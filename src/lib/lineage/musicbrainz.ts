@@ -19,12 +19,19 @@ const queues: Record<Priority, Job[]> = { now: [], background: [] };
 let nextSlotAt = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
-function throttledFetch(url: string, priority: Priority, signal?: AbortSignal): Promise<Response> {
+function throttledFetch(
+  url: string,
+  priority: Priority,
+  signal?: AbortSignal,
+): Promise<Response> {
   return new Promise((resolve, reject) => {
     queues[priority].push({
       signal,
       send: () =>
-        fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal }).then(resolve, reject),
+        fetch(url, {
+          headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+          signal,
+        }).then(resolve, reject),
       drop: () => reject(signal?.reason),
     });
     runQueue();
@@ -33,22 +40,29 @@ function throttledFetch(url: string, priority: Priority, signal?: AbortSignal): 
 
 function runQueue() {
   if (timer || (!queues.now.length && !queues.background.length)) return;
-  timer = setTimeout(() => {
-    timer = null;
-    const job = queues.now.shift() ?? queues.background.shift();
-    if (job?.signal?.aborted) {
-      job.drop();
-    } else if (job) {
-      nextSlotAt = Date.now() + MIN_INTERVAL_MS;
-      job.send();
-    }
-    runQueue();
-  }, Math.max(0, nextSlotAt - Date.now()));
+  timer = setTimeout(
+    () => {
+      timer = null;
+      const job = queues.now.shift() ?? queues.background.shift();
+      if (job?.signal?.aborted) {
+        job.drop();
+      } else if (job) {
+        nextSlotAt = Date.now() + MIN_INTERVAL_MS;
+        job.send();
+      }
+      runQueue();
+    },
+    Math.max(0, nextSlotAt - Date.now()),
+  );
 }
 
 // 503 means "slow down": back off and retry. Network errors get the same treatment,
 // except when the caller cancelled.
-async function fetchWithRetry(url: string, priority: Priority, signal?: AbortSignal): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  priority: Priority,
+  signal?: AbortSignal,
+): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     try {
       const res = await throttledFetch(url, priority, signal);
@@ -95,20 +109,44 @@ const containsWords = (longer: string, shorter: string) =>
 // exact: same name, ignoring spacing ("Space Ape"/"Spaceape").
 // loose: a leader inside a group name either way round: "Horace Silver" / "The Horace Silver
 // Quintet", "Dinosaur Jr." / "Dinosaur".
-export function artistMatch(wanted: string, creditedNames: string[]): "exact" | "loose" | null {
+export function artistMatch(
+  wanted: string,
+  creditedNames: string[],
+): "exact" | "loose" | null {
   const want = artistParts(wanted);
   const have = creditedNames.flatMap(artistParts);
-  if (want.some((w) => have.some((h) => compact(w) === compact(h)))) return "exact";
-  if (want.some((w) => have.some((h) => containsWords(h, w) || containsWords(w, h)))) return "loose";
+  if (want.some((w) => have.some((h) => compact(w) === compact(h))))
+    return "exact";
+  if (
+    want.some((w) =>
+      have.some((h) => containsWords(h, w) || containsWords(w, h)),
+    )
+  )
+    return "loose";
   return null;
 }
 
-const ROMAN: Record<string, string> = { i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10" };
-const titleKey = (s: string) => normalize(s).replace(/\b(i{1,3}|iv|vi{0,3}|ix|x)\b/g, (m) => ROMAN[m] ?? m);
+const ROMAN: Record<string, string> = {
+  i: "1",
+  ii: "2",
+  iii: "3",
+  iv: "4",
+  v: "5",
+  vi: "6",
+  vii: "7",
+  viii: "8",
+  ix: "9",
+  x: "10",
+};
+const titleKey = (s: string) =>
+  normalize(s).replace(/\b(i{1,3}|iv|vi{0,3}|ix|x)\b/g, (m) => ROMAN[m] ?? m);
 
 // Dice coefficient over character bigrams: 1 = identical, ~0.9 = one or two characters off.
 function similarity(a: string, b: string): number {
-  const grams = (s: string) => Array.from({ length: Math.max(s.length - 1, 0) }, (_, i) => s.slice(i, i + 2));
+  const grams = (s: string) =>
+    Array.from({ length: Math.max(s.length - 1, 0) }, (_, i) =>
+      s.slice(i, i + 2),
+    );
   const ga = grams(a);
   const gb = grams(b);
   if (!ga.length || !gb.length) return 0;
@@ -125,7 +163,10 @@ function similarity(a: string, b: string): number {
   return (2 * shared) / (ga.length + gb.length);
 }
 
-export function titleMatch(wanted: string, found: string): "exact" | "close" | null {
+export function titleMatch(
+  wanted: string,
+  found: string,
+): "exact" | "close" | null {
   const w = titleKey(wanted);
   const f = titleKey(found);
   if (w === f) return "exact";
@@ -150,7 +191,9 @@ export function oneEditApart(a: string, b: string): boolean {
   while (i < s.length && s[i] === l[i]) i++;
   // Skip the first difference: one letter in each when the lengths match, one in the longer
   // otherwise. The rest must then be identical.
-  return s.length === l.length ? s.slice(i + 1) === l.slice(i + 1) : s.slice(i) === l.slice(i + 1);
+  return s.length === l.length
+    ? s.slice(i + 1) === l.slice(i + 1)
+    : s.slice(i) === l.slice(i + 1);
 }
 
 function escapeLucene(s: string): string {
@@ -176,10 +219,13 @@ const yearOf = (rg: ReleaseGroup) => {
   const date = rg["first-release-date"];
   return date ? Number(date.slice(0, 4)) : null;
 };
-const coverUrlOf = (rg: ReleaseGroup) => `https://coverartarchive.org/release-group/${rg.id}/front-250`;
+const coverUrlOf = (rg: ReleaseGroup) =>
+  `https://coverartarchive.org/release-group/${rg.id}/front-250`;
 
 const creditedAs = (rg: ReleaseGroup) =>
-  (rg["artist-credit"] ?? []).map((c) => c.name + (c.joinphrase ?? "")).join("");
+  (rg["artist-credit"] ?? [])
+    .map((c) => c.name + (c.joinphrase ?? ""))
+    .join("");
 
 // Every name the release group's artists go by. The sort name covers artists credited in
 // another script, e.g. 吉村弘 has sort name "Yoshimura, Hiroshi".
@@ -189,7 +235,10 @@ function creditNames(rg: ReleaseGroup): string[] {
     names.push(c.name);
     if (c.artist?.name) names.push(c.artist.name);
     const sort = c.artist?.["sort-name"];
-    if (sort) names.push(sort.includes(", ") ? sort.split(", ").reverse().join(" ") : sort);
+    if (sort)
+      names.push(
+        sort.includes(", ") ? sort.split(", ").reverse().join(" ") : sort,
+      );
   }
   return names;
 }
@@ -221,7 +270,10 @@ const NOT_AN_ALBUM = new Set(["Single", "Broadcast"]);
 const CACHE_LIMIT = 5000;
 const cache = new Map<string, Promise<Verification>>();
 
-export function verifyAlbum(artist: string, rawTitle: string): Promise<Verification> {
+export function verifyAlbum(
+  artist: string,
+  rawTitle: string,
+): Promise<Verification> {
   const key = `${normalize(artist)}|${titleKey(rawTitle.replace(EDITION_SUFFIX, ""))}`;
   const cached = cache.get(key);
   if (cached) return cached;
@@ -235,7 +287,10 @@ export function verifyAlbum(artist: string, rawTitle: string): Promise<Verificat
   return result;
 }
 
-async function lookupAlbum(artist: string, rawTitle: string): Promise<Verification> {
+async function lookupAlbum(
+  artist: string,
+  rawTitle: string,
+): Promise<Verification> {
   const title = rawTitle.replace(EDITION_SUFFIX, "").trim();
   const [, firstArtist = normalize(artist)] = artistParts(artist);
   const t = escapeLucene(title);
@@ -260,7 +315,8 @@ async function lookupAlbum(artist: string, rawTitle: string): Promise<Verificati
       const match = titleMatch(title, rg.title);
       // At most one side may be fuzzy. Both together let "Burial" + "Archangel" match
       // "Burial Hex" + "Archangel Invocation".
-      if (!artistFit || !match || (artistFit === "loose" && match === "close")) continue;
+      if (!artistFit || !match || (artistFit === "loose" && match === "close"))
+        continue;
       if (NOT_AN_ALBUM.has(rg["primary-type"] ?? "")) {
         notAnAlbum ??= rg;
         continue;
@@ -287,11 +343,16 @@ async function lookupAlbum(artist: string, rawTitle: string): Promise<Verificati
   }
 
   if (notAnAlbum) {
-    return { found: false, reason: `only a ${notAnAlbum["primary-type"]?.toLowerCase()} named "${notAnAlbum.title}"` };
+    return {
+      found: false,
+      reason: `only a ${notAnAlbum["primary-type"]?.toLowerCase()} named "${notAnAlbum.title}"`,
+    };
   }
   return {
     found: false,
-    reason: closest ? `closest: "${closest.title}" (score ${closest.score})` : "no results",
+    reason: closest
+      ? `closest: "${closest.title}" (score ${closest.score})`
+      : "no results",
   };
 }
 
@@ -305,13 +366,19 @@ const SUGGESTIONS = 8;
 const SEARCH_CACHE_LIMIT = 2000;
 const searchCache = new Map<string, AlbumSuggestion[]>();
 
-export async function searchAlbums(text: string, signal?: AbortSignal): Promise<AlbumSuggestion[]> {
+export async function searchAlbums(
+  text: string,
+  signal?: AbortSignal,
+): Promise<AlbumSuggestion[]> {
   // Lowercase also stops typed "AND"/"OR" from being read as search operators.
   const key = text.toLowerCase().replace(/\s+/g, " ").trim();
   const cached = searchCache.get(key);
   if (cached) return cached;
 
-  const words = key.split(" ").filter((w) => /[\p{L}\p{N}]/u.test(w)).map(escapeLucene);
+  const words = key
+    .split(" ")
+    .filter((w) => /[\p{L}\p{N}]/u.test(w))
+    .map(escapeLucene);
   if (!words.length) return [];
 
   // Each word must appear in the title or the artist. The last word may be half typed, so it
@@ -329,16 +396,34 @@ export async function searchAlbums(text: string, signal?: AbortSignal): Promise<
   const results = groups
     .sort((a, b) => rank(b) - rank(a))
     .slice(0, SUGGESTIONS)
-    .map((rg) => ({
-      mbid: rg.id,
-      artist: creditedAs(rg),
-      title: rg.title,
-      year: yearOf(rg),
-      type: rg["primary-type"] ?? "Album",
-      coverUrl: coverUrlOf(rg),
-    }));
+    .map(formatReleaseGroup);
 
   searchCache.set(key, results);
-  if (searchCache.size > SEARCH_CACHE_LIMIT) searchCache.delete(searchCache.keys().next().value!);
+  if (searchCache.size > SEARCH_CACHE_LIMIT)
+    searchCache.delete(searchCache.keys().next().value!);
   return results;
+}
+
+// A release group as the app's album shape, for search results and the album page.
+function formatReleaseGroup(rg: ReleaseGroup): AlbumSuggestion {
+  return {
+    mbid: rg.id,
+    artist: creditedAs(rg),
+    title: rg.title,
+    year: yearOf(rg),
+    type: rg["primary-type"] ?? "Album",
+    coverUrl: coverUrlOf(rg),
+  };
+}
+
+// One album by its MusicBrainz id, for the album page when the album has no saved chart to
+// read its details from. Returns null if MusicBrainz has no such album; other failures throw.
+export async function getAlbum(mbid: string): Promise<AlbumSuggestion | null> {
+  const url = `https://musicbrainz.org/ws/2/release-group/${encodeURIComponent(mbid)}?fmt=json&inc=artist-credits`;
+  // "now": someone is waiting for the page.
+  const res = await fetchWithRetry(url, "now");
+  // 404 is an id that doesn't exist, 400 one that isn't a valid id at all.
+  if (res.status === 404 || res.status === 400) return null;
+  if (!res.ok) throw new Error(`MusicBrainz HTTP ${res.status}`);
+  return formatReleaseGroup((await res.json()) as ReleaseGroup);
 }

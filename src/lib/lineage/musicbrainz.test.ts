@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { artistMatch, normalize, oneEditApart, titleMatch, verifyAlbum } from "./musicbrainz";
+import { artistMatch, getAlbum, normalize, oneEditApart, titleMatch, verifyAlbum } from "./musicbrainz";
 
 describe("normalize", () => {
   it.each([
@@ -172,5 +172,55 @@ describe("verifyAlbum", () => {
 
     expect(await verify("Nobody", "Nothing At All")).toEqual({ found: false, reason: "no results" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("getAlbum", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  // The lookup endpoint returns one release group, not a list of them.
+  async function lookUp(mbid: string, response: Response) {
+    const fetchMock = vi.fn<typeof fetch>(async () => response);
+    vi.stubGlobal("fetch", fetchMock);
+    const result = getAlbum(mbid);
+    await vi.runAllTimersAsync();
+    return { album: await result, fetchMock };
+  }
+
+  it("returns the album in the app's shape", async () => {
+    const { album, fetchMock } = await lookUp(
+      "id-Loveless",
+      Response.json(releaseGroup("Loveless", [{ name: "my bloody valentine" }])),
+    );
+
+    expect(album).toEqual({
+      mbid: "id-Loveless",
+      artist: "my bloody valentine",
+      title: "Loveless",
+      year: 2007, // releaseGroup's fixed test date
+      type: "Album",
+      coverUrl: "https://coverartarchive.org/release-group/id-Loveless/front-250",
+    });
+    expect(fetchMock.mock.calls[0][0]).toContain("/release-group/id-Loveless?");
+  });
+
+  it("returns null when MusicBrainz has no such album", async () => {
+    const { album } = await lookUp("missing", new Response("{}", { status: 404 }));
+    expect(album).toBeNull();
+  });
+
+  it("throws on other failures", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
+    const result = getAlbum("broken");
+    const assertion = expect(result).rejects.toThrow("MusicBrainz HTTP 500");
+    await vi.runAllTimersAsync();
+    await assertion;
   });
 });
