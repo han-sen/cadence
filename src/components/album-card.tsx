@@ -18,14 +18,11 @@ export const isRejected = (a: AlbumEntry) =>
 export const albumYear = (album: AlbumPick, check: Confirmed) =>
   check.match === "exact" && check.year ? check.year : album.year;
 
-// Padding and lines shared by the card and its placeholder, so the swap doesn't shift anything.
-// In a genre card, albums sit in a grid: top and left lines only, so neighbors don't double up
-// and the last row has no bottom line. The list clips the leftmost line at the card's edge.
-// Kindred albums stand alone, so they keep a full border.
+// The frame shared by the card and its placeholder, so the swap doesn't shift anything.
+// In a genre card, each album is a small raised tile on the card's floor. Kindred albums stand
+// alone on the blue section, as full cards.
 const cardFrame = (isStandalone: boolean) =>
-  isStandalone
-    ? "rounded-3xl bg-white p-5"
-    : "-ml-px border-t border-l border-(--line) p-5";
+  isStandalone ? "depth-card-low rounded-3xl bg-white p-5" : "album-tile p-5";
 
 // Full album card: cover and title, then "why", links and shared traits. Stacked in a narrow
 // card; once the card is 400px wide (an odd last album spanning its genre card, say) the
@@ -53,7 +50,7 @@ export function AlbumCard({
     >
       <div className={WIDE}>
         <div className="flex gap-4">
-          <Cover url={check.coverUrl} className={coverClass} />
+          <Cover url={check.coverUrl} className={`${coverClass} sleeve-shadow`} />
           {/* min-w-0 lets this column shrink beside the cover, and break-words wraps a word
               too long for it (Moodymann's "Silentintroduction") instead of overflowing. */}
           <div className="flex min-w-0 flex-col justify-between break-words">

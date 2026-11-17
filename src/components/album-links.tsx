@@ -41,7 +41,7 @@ export function AlbumLinks({
               aria-label={`Search ${site} for ${title}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="grid size-7 place-items-center rounded-full bg-(--btn-bg) text-(--btn-fg) transition-opacity hover:opacity-80"
+              className="btn-tactile grid size-7 place-items-center rounded-full text-(--btn-fg) transition-opacity hover:opacity-80"
             >
               <BrandIcon icon={icon} />
             </a>

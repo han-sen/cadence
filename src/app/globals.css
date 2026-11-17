@@ -28,6 +28,17 @@
   --chip: rgb(11 11 20 / 0.06);
   --btn-bg: var(--accent);
   --btn-fg: #ffffff;
+
+  /* Tactile parts. An album tile is a small raised card inside a genre card, which gets a
+     faintly tinted floor so the white tiles stand out from it. The round link buttons get a
+     lit top edge and a small drop shadow, so they look pressable. */
+  --tile-floor: #f3f3f9;
+  --tile-bg: #ffffff;
+  --tile-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.9), 0 1px 1px rgb(31 34 120 / 0.06),
+    0 6px 12px -6px rgb(40 40 110 / 0.18);
+  --btn-fill: linear-gradient(180deg, #7684ff 0%, var(--accent) 60%, #4450ec 100%);
+  --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45), 0 3px 7px -2px rgb(81 97 255 / 0.6);
 }
 
 .surface-blue {
@@ -38,6 +49,10 @@
   --chip: rgb(255 255 255 / 0.16);
   --btn-bg: #ffffff;
   --btn-fg: var(--accent);
+  --tile-bg: rgb(255 255 255 / 0.13);
+  --tile-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 6px 12px -6px rgb(0 0 80 / 0.5);
+  --btn-fill: linear-gradient(180deg, #ffffff 0%, #e9ebff 100%);
+  --btn-shadow: inset 0 1px 0 #ffffff, 0 3px 7px -2px rgb(0 0 60 / 0.5);
   color: var(--ink);
 }
 
@@ -71,6 +86,76 @@
 @utility dots {
   background-image: radial-gradient(rgb(15 18 140 / 0.55) 1.6px, transparent 1.8px);
   background-size: 9px 9px;
+}
+
+/* Depth. White cards get a tight contact shadow plus a wide soft one, both tinted with the
+   page's blue so they read as light falling off the card, not grey smudges. */
+@utility depth-card {
+  box-shadow:
+    0 1px 1px rgb(31 34 120 / 0.05),
+    0 6px 14px -4px rgb(40 40 110 / 0.09),
+    0 28px 56px -20px rgb(40 40 120 / 0.2);
+}
+
+/* A card that's lifted, for hover on the clickable ones. */
+@utility depth-card-raised {
+  box-shadow:
+    0 2px 2px rgb(31 34 120 / 0.05),
+    0 14px 24px -6px rgb(40 40 110 / 0.12),
+    0 40px 70px -22px rgb(40 40 120 / 0.28);
+}
+
+/* The same shape for the blue tiles, in the accent's own color. */
+@utility depth-tile {
+  box-shadow:
+    0 1px 1px rgb(31 34 184 / 0.2),
+    0 10px 20px -6px rgb(31 34 184 / 0.28),
+    0 30px 60px -22px rgb(31 34 184 / 0.45);
+}
+
+/* Lower versions for the chart page, where many large cards sit close together: the full
+   shadows overlap there and blur the cards' edges. */
+@utility depth-card-low {
+  box-shadow:
+    0 1px 1px rgb(31 34 120 / 0.05),
+    0 3px 8px -3px rgb(40 40 110 / 0.08),
+    0 10px 20px -14px rgb(40 40 120 / 0.14);
+}
+
+@utility depth-tile-low {
+  box-shadow:
+    0 1px 1px rgb(31 34 184 / 0.16),
+    0 6px 12px -6px rgb(31 34 184 / 0.22),
+    0 14px 24px -18px rgb(31 34 184 / 0.3);
+}
+
+/* The tactile parts, drawn from the surface variables above so each works on white and blue. */
+@utility album-tile {
+  border-radius: 18px;
+  background: var(--tile-bg);
+  box-shadow: var(--tile-shadow);
+}
+
+@utility btn-tactile {
+  background: var(--btn-fill);
+  box-shadow: var(--btn-shadow);
+}
+
+/* An album cover as a sleeve: a hard contact line and a shadow thrown down and to the right. */
+@utility sleeve-shadow {
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.2),
+    4px 6px 12px -6px rgb(11 11 40 / 0.5);
+}
+
+/* A vinyl record: grooves, with the accent blue as its label. Sits behind a demo cover and
+   slides out of the sleeve on hover. */
+@utility record {
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle, var(--accent) 0 14%, #111 14.5% 16%, transparent 16.5%),
+    repeating-radial-gradient(circle, #16161c 0 2px, #24242c 2px 3px);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
 }
 
 @keyframes fade-in {

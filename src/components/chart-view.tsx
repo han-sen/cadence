@@ -63,6 +63,7 @@ export function ChartView({
       ).length
     : 0;
   const kindred = state.albums.filter((a) => a.album.kindred);
+  const kindredCount = kindred.filter((a) => a.check?.found).length;
 
   return (
     <ActiveTrait value={traitContext}>
@@ -76,7 +77,7 @@ export function ChartView({
 
         <section
           aria-label="Seed album"
-          className="surface-blue relative isolate animate-[fade-in_.4s_ease-out] overflow-hidden rounded-[32px] bg-accent p-6 motion-reduce:animate-none sm:p-8"
+          className="surface-blue depth-tile-low relative isolate animate-[fade-in_.4s_ease-out] overflow-hidden rounded-[32px] bg-accent p-6 motion-reduce:animate-none sm:p-8"
         >
           <DuotoneBackdrop coverUrl={album.coverUrl} />
           <div className="meta mb-6 flex justify-between gap-4 text-(--muted)">
@@ -167,11 +168,16 @@ export function ChartView({
         {kindred.some((a) => !isRejected(a)) && (
           <section
             aria-label="Kindred"
-            className="relative isolate mt-8 flex flex-col gap-5 overflow-hidden rounded-[32px] p-4 sm:p-6"
+            className="depth-tile-low relative isolate mt-8 flex flex-col gap-5 overflow-hidden rounded-[32px] p-4 sm:p-6"
           >
             <GradientBackdrop />
-            <div className="surface-blue self-start py-4">
-              <SectionLabel label="Kindred" hint="Same feel, different genre" />
+            <div className="surface-blue py-4">
+              <SectionLabel
+                label="Kindred"
+                hint="Same feel, different genre"
+                number="04"
+                count={kindredCount ? `${kindredCount} ${kindredCount === 1 ? "album" : "albums"}` : undefined}
+              />
             </div>
             <ul className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
               <AlbumCards

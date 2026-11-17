@@ -30,17 +30,17 @@ export function LineageFlow({
     >
       <GenreCables genres={genres} />
       {roots.length > 0 && (
-        <Tier label="Roots" hint="Where it came from">
+        <Tier number="01" label="Roots" hint="Where it came from" count={tierCount(roots)}>
           <GenreRow genres={roots} all={genres} albumsOf={albumsOf} />
         </Tier>
       )}
       {seed.length > 0 && (
-        <Tier label="Siblings" hint="Same scene">
+        <Tier number="02" label="Siblings" hint="Same scene" count={tierCount(seed)}>
           <GenreRow genres={seed} all={genres} albumsOf={albumsOf} emphasis />
         </Tier>
       )}
       {branches.length > 0 && (
-        <Tier label="Branches" hint="Where it led">
+        <Tier number="03" label="Branches" hint="Where it led" count={tierCount(branches)}>
           <GenreRow genres={branches} all={genres} albumsOf={albumsOf} />
         </Tier>
       )}
@@ -48,28 +48,68 @@ export function LineageFlow({
   );
 }
 
-// Section label with its subtitle on a second line, so it stays narrow and clear of cables.
-export function SectionLabel({ label, hint }: { label: string; hint: string }) {
+// Section label with its subtitle on a line above. A numbered label is one of a chart's four
+// sections: the number matches the home page's reading key, and `count` says what the section
+// holds, set small at the far right, level with the title's baseline. Nothing joins the two,
+// so cables can pass between them.
+export function SectionLabel({
+  label,
+  hint,
+  number,
+  count,
+}: {
+  label: string;
+  hint: string;
+  number?: string;
+  count?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="meta text-(--muted)">{hint}</span>
-      <h2 className="display text-4xl sm:text-5xl">{label}</h2>
+    <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col gap-1.5">
+        <span className="meta text-(--muted)">{hint}</span>
+        <h2 className="display text-4xl sm:text-5xl">
+          {number && (
+            <span aria-hidden className="mr-[0.28em] text-(--faint)">
+              {number}
+            </span>
+          )}
+          {label}
+        </h2>
+      </div>
+      {count && (
+        <span className="meta mb-1.5 whitespace-nowrap text-(--muted)">
+          {count}
+        </span>
+      )}
     </div>
   );
 }
 
+// "2 genres · 1978–1985": how many genres a tier has and when they emerged.
+function tierCount(genres: Genre[]) {
+  const years = genres.map((g) => g.emergedYear);
+  const first = Math.min(...years);
+  const last = Math.max(...years);
+  const span = first === last ? `c. ${first}` : `${first}–${last}`;
+  return `${genres.length} ${genres.length === 1 ? "genre" : "genres"} · ${span}`;
+}
+
 function Tier({
+  number,
   label,
   hint,
+  count,
   children,
 }: {
+  number: string;
   label: string;
   hint: string;
+  count: string;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <SectionLabel label={label} hint={hint} />
+      <SectionLabel label={label} hint={hint} number={number} count={count} />
       {children}
     </div>
   );
@@ -152,14 +192,14 @@ function GenreCard({
   return (
     <div
       data-genre-id={genre.id}
-      className={`${CARD} @container flex min-w-0 flex-1 flex-col ${emphasis ? "surface-blue bg-accent" : "bg-white"}`}
+      className={`${CARD} @container flex min-w-0 flex-1 flex-col ${emphasis ? "surface-blue depth-tile-low bg-accent" : "depth-card-low bg-(--tile-floor)"}`}
     >
       <GenreHeading genre={genre} genres={genres} />
       <GenreStatus albums={albums} />
       {/* A card can be stretched to match a taller one beside it. The list fills the extra
-          height and its rows stretch with it, so the dividers between albums (their borders)
-          run to the bottom of the card instead of stopping short. */}
-      <ul className={`grid flex-1 overflow-hidden ${ALBUM_GRID}`}>
+          height and its rows stretch with it, so the album tiles reach the bottom of the card
+          instead of stopping short. */}
+      <ul className={`grid flex-1 gap-2 px-2.5 pb-2.5 ${ALBUM_GRID}`}>
         <AlbumCards
           albums={albums}
           coverClass="size-16 sm:size-22"

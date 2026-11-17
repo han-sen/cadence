@@ -17,7 +17,7 @@ export function HomeView() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 pt-2 pb-6 sm:gap-5 sm:pt-4 sm:pb-10">
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col justify-between gap-6 rounded-[32px] bg-white p-6 sm:p-8">
+        <div className="depth-card flex flex-col justify-between gap-6 rounded-[32px] bg-white p-6 sm:p-8">
           <h2 className="display max-w-xl text-3xl sm:text-4xl">
             Name an album you love. See where it came from, where it led, and
             what to play next.
@@ -49,7 +49,7 @@ function ReadingKey() {
   return (
     <aside
       aria-label="How to read a chart"
-      className="surface-blue relative isolate hidden flex-col justify-between gap-6 overflow-hidden rounded-[32px] bg-accent p-6 sm:flex sm:p-8"
+      className="surface-blue depth-tile relative isolate hidden flex-col justify-between gap-6 overflow-hidden rounded-[32px] bg-accent p-6 sm:flex sm:p-8"
     >
       <div aria-hidden className="dots absolute inset-0 -z-10" />
       <h2 className="meta text-(--muted)">How to read a chart</h2>
