@@ -23,14 +23,18 @@ const label = (album: AlbumSuggestion) => `${album.title} — ${album.artist}`;
 // arrow keys, Enter, Escape, focus, and announcing results to screen readers.
 // useAsyncList runs `load` whenever the text changes and aborts the previous run, so only the
 // latest search can update the list.
+// `isOnPage` is for a box sitting on the page background rather than in a white card: the box
+// itself is white and raised instead of lavender.
 export function AlbumSearch({
   onSelect,
   isDisabled,
   placeholder = "Search by album or artist, e.g. Untrue Burial",
+  isOnPage = false,
 }: {
   onSelect: (album: AlbumSuggestion) => void;
   isDisabled: boolean;
   placeholder?: string;
+  isOnPage?: boolean;
 }) {
   // Picking an album fills the input with its label; that text shouldn't trigger a new search.
   const pickedLabel = useRef<string | null>(null);
@@ -81,11 +85,13 @@ export function AlbumSearch({
       isDisabled={isDisabled}
       className="flex flex-1 flex-col gap-1"
     >
-      <Label className="meta text-(--muted)">Album</Label>
+      {/* Hidden on screen (the hero's headline says what the box is for) but kept as the
+          input's name, so screen readers announce more than "combo box". */}
+      <Label className="sr-only">Album</Label>
       <div className="relative">
         <Input
           placeholder={placeholder}
-          className={`h-14 w-full rounded-full border-2 border-transparent bg-background px-6 text-base outline-none placeholder:text-(--faint) focus:border-accent disabled:cursor-not-allowed disabled:text-(--muted) disabled:placeholder:text-(--muted) sm:text-lg ${searching ? "pr-28" : ""}`}
+          className={`h-14 w-full rounded-full border-2 border-transparent px-6 ${isOnPage ? "depth-card bg-white" : "bg-background"} text-base outline-none placeholder:text-(--faint) focus:border-accent disabled:cursor-not-allowed disabled:text-(--muted) disabled:placeholder:text-(--muted) sm:text-lg ${searching ? "pr-28" : ""}`}
         />
         {searching && (
           <span className="meta absolute top-1/2 right-6 -translate-y-1/2 text-(--faint)">
