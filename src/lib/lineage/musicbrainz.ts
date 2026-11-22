@@ -64,10 +64,19 @@ async function fetchWithRetry(
   signal?: AbortSignal,
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
+    // Temporary timing log, to see where slow charts spend their time. "queued" is how many
+    // requests were already waiting; "took" covers the wait for a slot plus the request itself.
+    const queued = queues.now.length + queues.background.length;
+    const started = Date.now();
+    const path = url.replace("https://musicbrainz.org/ws/2", "").slice(0, 120);
     try {
       const res = await throttledFetch(url, priority, signal);
+      console.log(`[mb] ${res.status} ${priority} attempt=${attempt + 1} queued=${queued} took=${Date.now() - started}ms ${path}`);
       if (res.status !== 503 || attempt >= RETRY_DELAYS_MS.length) return res;
     } catch (err) {
+      if (!signal?.aborted) {
+        console.log(`[mb] network error ${priority} attempt=${attempt + 1} took=${Date.now() - started}ms ${path}`);
+      }
       if (signal?.aborted || attempt >= RETRY_DELAYS_MS.length) throw err;
     }
     await sleep(RETRY_DELAYS_MS[attempt]);

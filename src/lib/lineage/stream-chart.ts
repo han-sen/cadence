@@ -26,6 +26,13 @@ export async function streamChart(artist: string, title: string, { emit, signal 
   });
   signal.addEventListener("abort", () => stream.abort(), { once: true });
 
+  // Temporary timing log: seconds since the request started, prefixed with the album.
+  const startedAt = Date.now();
+  const log = (msg: string) =>
+    console.log(`[chart] ${artist} – ${title} +${((Date.now() - startedAt) / 1000).toFixed(1)}s ${msg}`);
+  log("started");
+  let firstTextLogged = false;
+
   let seedSent = false;
   let genresSent = 0;
   let albumsSent = 0;
@@ -47,7 +54,10 @@ export async function streamChart(artist: string, title: string, { emit, signal 
     }
     verifications = verifications.then(async () => {
       if (signal.aborted) return;
-      emit({ type: "verified", id, check: await verifyAlbum(album.artist, album.title) });
+      const checkStarted = Date.now();
+      const check = await verifyAlbum(album.artist, album.title);
+      log(`verified #${id} in ${Date.now() - checkStarted}ms found=${check.found}`);
+      emit({ type: "verified", id, check });
     });
   };
 
@@ -84,6 +94,10 @@ export async function streamChart(artist: string, title: string, { emit, signal 
   let text = "";
   for await (const event of stream) {
     if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      if (!firstTextLogged) {
+        log("first output text (thinking done)");
+        firstTextLogged = true;
+      }
       text += event.delta.text;
       try {
         sendCompleted(parsePartialJson(text), false);
@@ -98,7 +112,9 @@ export async function streamChart(artist: string, title: string, { emit, signal 
   if (final.stop_reason === "max_tokens") throw new ChartError("The chart was cut off before it finished.");
 
   sendCompleted(JSON.parse(text), true);
+  log(`Claude done: ${albumsSent} albums, ${final.usage.output_tokens} output tokens`);
   await verifications;
+  log("all checks done");
 
   emit({
     type: "done",
