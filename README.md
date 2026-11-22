@@ -35,6 +35,15 @@ You need Node, Docker (for the local Postgres), an Anthropic API key and a Googl
 
 Sign in with Google to search for an album and chart it. The six albums on the home page are charts saved in the original database; on a fresh one, each is charted the first time a signed-in visitor opens it.
 
+## Deploying
+
+Cadence runs on Render as one web service with Render Postgres.
+
+- Build command: `npm ci && npm run build`
+- Start command: `npm run db:migrate && npm start`
+
+`db:migrate` applies any new migrations before the app starts (the free plan has no pre-deploy step). If a migration fails, the app doesn't start and Render keeps the previous version running. Don't set `NODE_ENV` yourself: Render sets it when the app runs, and setting it by hand also skips dev dependencies during the build.
+
 ## Tests
 
 `npm test` runs the unit tests (Vitest) and reruns them on every save; `npm run test:run` runs them once.

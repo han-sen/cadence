@@ -27,7 +27,9 @@ export const takeChartToken = createLimiter(Number(process.env.CHART_REQUESTS_PE
 // limited too. 60 per 10 minutes is far more than picking an album takes.
 export const takeSearchToken = createLimiter(60, 10 * MINUTE);
 
-// The client's IP as reported by the host's proxy. Only trustworthy when the host sets this
-// header itself (check before deploying); otherwise anyone can send a fake one to dodge limits.
+// The client's IP. On Render, public traffic comes through Cloudflare, which sets
+// CF-Connecting-IP on every request and overwrites any copy the caller sent, so it can't be
+// faked. X-Forwarded-For can: Cloudflare appends to it rather than replacing it, so its first
+// entry is whatever the caller wrote. Locally there's no Cloudflare, so everyone is "local".
 export const clientKey = (request: Request) =>
-  request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "local";
+  request.headers.get("cf-connecting-ip") ?? "local";
