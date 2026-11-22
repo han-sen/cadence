@@ -66,7 +66,10 @@ export const Verification = z.discriminatedUnion("found", [
     // e.g. "Urban Hang Suite" vs "Maxwell's Urban Hang Suite".
     match: z.enum(["exact", "close"]),
   }),
-  z.object({ found: z.literal(false), reason: z.string() }),
+  // unchecked: MusicBrainz couldn't be reached (busy, rate limited, down), so the album wasn't
+  // checked at all. It's still shown, since most of Claude's picks are real; without the flag,
+  // the album was checked and not found, and it's left out.
+  z.object({ found: z.literal(false), reason: z.string(), unchecked: z.literal(true).optional() }),
 ]);
 
 // One album in the seed search dropdown (GET /api/search).

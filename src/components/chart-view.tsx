@@ -7,7 +7,7 @@ import {
   type ChartState,
   useChartStream,
 } from "@/lib/lineage/use-chart-stream";
-import { AlbumCards, isRejected } from "./album-card";
+import { AlbumCards, isRejected, isShown } from "./album-card";
 import { LineageFlow, SectionLabel } from "./lineage-flow";
 import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
@@ -59,11 +59,11 @@ export function ChartView({
 
   const matching = activeTrait
     ? state.albums.filter(
-        (a) => a.check?.found && sharesTrait(a.album, activeTrait),
+        (a) => isShown(a) && sharesTrait(a.album, activeTrait),
       ).length
     : 0;
   const kindred = state.albums.filter((a) => a.album.kindred);
-  const kindredCount = kindred.filter((a) => a.check?.found).length;
+  const kindredCount = kindred.filter(isShown).length;
 
   return (
     <ActiveTrait value={traitContext}>
@@ -202,6 +202,7 @@ export function ChartView({
 function StatusLine({ state }: { state: ChartState }) {
   const confirmed = state.albums.filter((a) => a.check?.found).length;
   const hidden = state.albums.filter(isRejected).length;
+  const unchecked = state.albums.filter((a) => a.check?.found === false && a.check.unchecked).length;
   const seconds = (to?: number) =>
     state.startedAt && to ? ((to - state.startedAt) / 1000).toFixed(1) : null;
 
@@ -212,6 +213,7 @@ function StatusLine({ state }: { state: ChartState }) {
       text = `Mapping… ${state.genres.length} genres, ${confirmed} albums confirmed so far`;
   } else if (state.status === "done") {
     text = `Done in ${seconds(state.finishedAt)}s (first result after ${seconds(state.firstEventAt)}s). ${confirmed} albums confirmed on MusicBrainz`;
+    if (unchecked) text += `, ${unchecked} shown unverified because MusicBrainz was busy`;
     text += hidden
       ? `; ${hidden} couldn't be confirmed and ${hidden === 1 ? "was" : "were"} left out.`
       : ".";
@@ -240,7 +242,7 @@ function seedProgress(state: ChartState): SeedProgress {
     traitsArrived: state.seed !== undefined,
     albumsNamed: state.albums.length > 0,
     finished:
-      state.status !== "streaming" || state.albums.some((a) => a.check?.found),
+      state.status !== "streaming" || state.albums.some(isShown),
   };
 }
 

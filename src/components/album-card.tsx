@@ -6,17 +6,19 @@ import { Cover, CoverPlaceholder } from "./cover";
 import { TraitList, useDimmed } from "./trait-filter";
 import { AlbumLinks } from "./album-links";
 
-// The match details for an album MusicBrainz confirmed. Extract picks the union member
-// whose `found` is true.
-export type Confirmed = Extract<Verification, { found: true }>;
-
 // Checked and not found: the album may not exist, so it's never shown.
 export const isRejected = (a: AlbumEntry) =>
-  a.check !== undefined && !a.check.found;
+  a.check !== undefined && !a.check.found && !a.check.unchecked;
+
+// Shown as a card: confirmed on MusicBrainz, or not checked because MusicBrainz couldn't be
+// reached (then it's Claude's details, marked unverified).
+export const isShown = (a: AlbumEntry) =>
+  a.check !== undefined && (a.check.found || a.check.unchecked === true);
 
 // A close match can be a reissue or a differently named edition, so its year may be wrong.
-export const albumYear = (album: AlbumPick, check: Confirmed) =>
-  check.match === "exact" && check.year ? check.year : album.year;
+// An unchecked album only has Claude's year.
+export const albumYear = (album: AlbumPick, check: Verification) =>
+  check.found && check.match === "exact" && check.year ? check.year : album.year;
 
 // The frame shared by the card and its placeholder, so the swap doesn't shift anything.
 // In a genre card, each album is a small raised tile on the card's floor. Kindred albums stand
@@ -39,7 +41,7 @@ export function AlbumCard({
   isStandalone = false,
 }: {
   album: AlbumPick;
-  check: Confirmed;
+  check: Verification;
   coverClass: string;
   isStandalone: boolean;
 }) {
@@ -50,7 +52,11 @@ export function AlbumCard({
     >
       <div className={WIDE}>
         <div className="flex gap-4">
-          <Cover url={check.coverUrl} className={`${coverClass} sleeve-shadow`} />
+          {check.found ? (
+            <Cover url={check.coverUrl} className={`${coverClass} sleeve-shadow`} />
+          ) : (
+            <NoCover className={`${coverClass} sleeve-shadow`} />
+          )}
           {/* min-w-0 lets this column shrink beside the cover, and break-words wraps a word
               too long for it (Moodymann's "Silentintroduction") instead of overflowing. */}
           <div className="flex min-w-0 flex-col justify-between break-words">
@@ -61,6 +67,11 @@ export function AlbumCard({
               <p className="mt-0.5 text-(--muted)">{album.artist}</p>
               <p className="meta mt-1.5 text-(--faint)">
                 {albumYear(album, check)}
+                {!check.found && (
+                  <span title="MusicBrainz was busy, so this album couldn't be checked">
+                    {" "}· unverified
+                  </span>
+                )}
               </p>
             </div>
 
@@ -124,7 +135,18 @@ export function AlbumCardPlaceholder({
   );
 }
 
-// Only confirmed albums are shown: a placeholder while the check runs, nothing if it fails.
+// Cover spot for an album MusicBrainz couldn't check, so there's no cover to fetch. Matches the
+// "no cover" square Cover shows when the art is missing.
+function NoCover({ className }: { className: string }) {
+  return (
+    <div aria-hidden className={`grid shrink-0 place-items-center rounded-md bg-(--chip) text-(--faint) ${className}`}>
+      ♪
+    </div>
+  );
+}
+
+// A placeholder while the check runs, the card once it's confirmed or couldn't be checked, and
+// nothing if it was checked and not found.
 export function AlbumCards({
   albums,
   coverClass,
@@ -146,7 +168,7 @@ export function AlbumCards({
           className={placeholderClass}
         />
       );
-    if (!check.found) return null;
+    if (!check.found && !check.unchecked) return null;
     return (
       <AlbumCard
         key={id}

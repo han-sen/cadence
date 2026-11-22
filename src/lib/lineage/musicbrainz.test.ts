@@ -173,6 +173,30 @@ describe("verifyAlbum", () => {
     expect(await verify("Nobody", "Nothing At All")).toEqual({ found: false, reason: "no results" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  // MusicBrainz rate-limiting the server isn't evidence the album is made up: it's marked
+  // unchecked (and shown) rather than not found (and hidden), after a single retry.
+  it("marks the album unchecked when MusicBrainz keeps answering 503", async () => {
+    const fetchMock = vi.fn(async () => new Response("", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await verify("Stevie Wonder", "Talking Book")).toEqual({
+      found: false,
+      unchecked: true,
+      reason: "MusicBrainz HTTP 503",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the retry when the first 503 clears", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValue(Response.json({ "release-groups": [releaseGroup("No. 1 in Heaven", [{ name: "Sparks" }])] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await verify("Sparks", "No. 1 in Heaven")).toMatchObject({ found: true, match: "exact" });
+  });
 });
 
 describe("getAlbum", () => {
@@ -214,6 +238,20 @@ describe("getAlbum", () => {
   it("returns null when MusicBrainz has no such album", async () => {
     const { album } = await lookUp("missing", new Response("{}", { status: 404 }));
     expect(album).toBeNull();
+  });
+
+  it("shares one request between callers asking for the same album at once", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json(releaseGroup("Untrue", [{ name: "Burial" }])),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const both = Promise.all([getAlbum("id-shared"), getAlbum("id-shared")]);
+    await vi.runAllTimersAsync();
+    const [a, b] = await both;
+
+    expect(a).toEqual(b);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("throws on other failures", async () => {

@@ -4,7 +4,10 @@ import type { AlbumSuggestion, Verification } from "./schema";
 // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
 const USER_AGENT = `Cadence/0.1 ( ${process.env.MB_CONTACT ?? "cadence-app"} )`;
 const MIN_INTERVAL_MS = 1100;
-const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000];
+// One short retry, then give up. On Render, MusicBrainz rate-limits the shared outgoing IP, and
+// a refused request is usually refused again however long we wait: the old 2+4+8+16s backoff
+// cost ~31s per album and still failed. A failed album check is shown as unchecked instead.
+const RETRY_DELAYS_MS = [1500];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -291,7 +294,7 @@ export function verifyAlbum(
 
   const result = lookupAlbum(artist, rawTitle).catch((err): Verification => {
     cache.delete(key); // don't remember failures; MusicBrainz may be reachable next time
-    return { found: false, reason: (err as Error).message };
+    return { found: false, unchecked: true, reason: (err as Error).message };
   });
   cache.set(key, result);
   if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!); // Maps keep insertion order, so this drops the oldest
@@ -427,9 +430,24 @@ function formatReleaseGroup(rg: ReleaseGroup): AlbumSuggestion {
   };
 }
 
+// Lookups by id, kept like verifyAlbum's: the promise is stored, so the album page and its
+// metadata (which Next can render separately, outside React's per-request cache()) share one
+// request instead of spending two of MusicBrainz's slots. Failures aren't kept.
+const albumCache = new Map<string, Promise<AlbumSuggestion | null>>();
+
 // One album by its MusicBrainz id, for the album page when the album has no saved chart to
 // read its details from. Returns null if MusicBrainz has no such album; other failures throw.
-export async function getAlbum(mbid: string): Promise<AlbumSuggestion | null> {
+export function getAlbum(mbid: string): Promise<AlbumSuggestion | null> {
+  const cached = albumCache.get(mbid);
+  if (cached) return cached;
+  const result = fetchAlbum(mbid);
+  albumCache.set(mbid, result);
+  result.catch(() => albumCache.delete(mbid));
+  if (albumCache.size > CACHE_LIMIT) albumCache.delete(albumCache.keys().next().value!);
+  return result;
+}
+
+async function fetchAlbum(mbid: string): Promise<AlbumSuggestion | null> {
   const url = `https://musicbrainz.org/ws/2/release-group/${encodeURIComponent(mbid)}?fmt=json&inc=artist-credits`;
   // "now": someone is waiting for the page.
   const res = await fetchWithRetry(url, "now");
