@@ -1,6 +1,12 @@
 "use client";
 
-import type { AlbumPick, Verification } from "@/lib/lineage/schema";
+import {
+  isConfirmed,
+  isNotFound,
+  isUnchecked,
+  type AlbumPick,
+  type Verification,
+} from "@/lib/lineage/schema";
 import type { AlbumEntry } from "@/lib/lineage/use-chart-stream";
 import { Cover, CoverPlaceholder } from "./cover";
 import { TraitList, useDimmed } from "./trait-filter";
@@ -8,17 +14,17 @@ import { AlbumLinks } from "./album-links";
 
 // Checked and not found: the album may not exist, so it's never shown.
 export const isRejected = (a: AlbumEntry) =>
-  a.check !== undefined && !a.check.found && !a.check.unchecked;
+  a.check !== undefined && isNotFound(a.check);
 
 // Shown as a card: confirmed on MusicBrainz, or not checked because MusicBrainz couldn't be
 // reached (then it's Claude's details, marked unverified).
 export const isShown = (a: AlbumEntry) =>
-  a.check !== undefined && (a.check.found || a.check.unchecked === true);
+  a.check !== undefined && (isConfirmed(a.check) || isUnchecked(a.check));
 
 // A close match can be a reissue or a differently named edition, so its year may be wrong.
 // An unchecked album only has Claude's year.
 export const albumYear = (album: AlbumPick, check: Verification) =>
-  check.found && check.match === "exact" && check.year ? check.year : album.year;
+  isConfirmed(check) && check.match === "exact" && check.year ? check.year : album.year;
 
 // The frame shared by the card and its placeholder, so the swap doesn't shift anything.
 // In a genre card, each album is a small raised tile on the card's floor. Kindred albums stand
@@ -52,7 +58,7 @@ export function AlbumCard({
     >
       <div className={WIDE}>
         <div className="flex gap-4">
-          {check.found ? (
+          {isConfirmed(check) ? (
             <Cover url={check.coverUrl} className={`${coverClass} sleeve-shadow`} />
           ) : (
             <NoCover className={`${coverClass} sleeve-shadow`} />
@@ -67,7 +73,7 @@ export function AlbumCard({
               <p className="mt-0.5 text-(--muted)">{album.artist}</p>
               <p className="meta mt-1.5 text-(--faint)">
                 {albumYear(album, check)}
-                {!check.found && (
+                {isUnchecked(check) && (
                   <span title="MusicBrainz was busy, so this album couldn't be checked">
                     {" "}· unverified
                   </span>
@@ -168,7 +174,7 @@ export function AlbumCards({
           className={placeholderClass}
         />
       );
-    if (!check.found && !check.unchecked) return null;
+    if (isNotFound(check)) return null;
     return (
       <AlbumCard
         key={id}

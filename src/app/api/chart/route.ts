@@ -9,6 +9,7 @@ import { chartStreamResponse } from "@/lib/lineage/chart-response";
 import { db } from "@/db";
 import { chart, chartView } from "@/db/schema";
 import { findCanonicalChart } from "@/db/queries";
+import { findUnchecked, startRecheck } from "@/lib/lineage/recheck";
 
 const Body = z.object({
   artist: z.string().trim().min(1).max(200),
@@ -57,6 +58,9 @@ export async function POST(request: Request) {
     run: async (send) => {
       if (existing) {
         // The album was charted before: replay that chart instead of calling Claude.
+        // Charts saved while MusicBrainz was refusing requests get another try in the
+        // background; this viewer sees the chart as saved, later viewers the improved one.
+        if (findUnchecked(existing.events).length > 0) startRecheck(existing.id);
         await recordView(session.user.id, existing.id);
         await replayChart(existing.events, send, request.signal);
         return;
@@ -126,6 +130,9 @@ async function saveChart({
       })
       .returning({ id: chart.id });
     await recordView(userId, saved.id);
+    // Albums MusicBrainz couldn't check while the chart streamed get another try in the
+    // background. Checked here first so charts with nothing to do don't cost a database read.
+    if (findUnchecked(events).length > 0) startRecheck(saved.id);
   } catch (err) {
     console.error("Saving the chart failed:", err);
   }

@@ -8,6 +8,7 @@ import {
   useChartStream,
 } from "@/lib/lineage/use-chart-stream";
 import { AlbumCards, isRejected, isShown } from "./album-card";
+import { isConfirmed, isUnchecked } from "@/lib/lineage/schema";
 import { LineageFlow, SectionLabel } from "./lineage-flow";
 import { SeedLoader, type SeedProgress } from "./seed-loader";
 import { ActiveTrait, sameTrait, sharesTrait, TraitList } from "./trait-filter";
@@ -200,9 +201,9 @@ export function ChartView({
 }
 
 function StatusLine({ state }: { state: ChartState }) {
-  const confirmed = state.albums.filter((a) => a.check?.found).length;
+  const confirmed = state.albums.filter((a) => a.check && isConfirmed(a.check)).length;
   const hidden = state.albums.filter(isRejected).length;
-  const unchecked = state.albums.filter((a) => a.check?.found === false && a.check.unchecked).length;
+  const unchecked = state.albums.filter((a) => a.check && isUnchecked(a.check)).length;
   const seconds = (to?: number) =>
     state.startedAt && to ? ((to - state.startedAt) / 1000).toFixed(1) : null;
 

@@ -72,6 +72,12 @@ export const Verification = z.discriminatedUnion("found", [
   z.object({ found: z.literal(false), reason: z.string(), unchecked: z.literal(true).optional() }),
 ]);
 
+// The three outcomes of a check, by name, so callers don't decode `found` and `unchecked`:
+// confirmed on MusicBrainz / looked up and not there / couldn't be looked up at all.
+export const isConfirmed = (check: Verification) => check.found;
+export const isNotFound = (check: Verification) => !check.found && !check.unchecked;
+export const isUnchecked = (check: Verification) => !check.found && check.unchecked === true;
+
 // One album in the seed search dropdown (GET /api/search).
 export const AlbumSuggestion = z.object({
   mbid: z.string(),

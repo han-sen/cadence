@@ -5,7 +5,7 @@ import type { ChartEvent } from "./events";
 import { chartGenreMatching } from "./kindred";
 import { verifyAlbum } from "./musicbrainz";
 import { EFFORT, MODEL, SYSTEM, userMessage } from "./prompt";
-import { AlbumPick, Genre, LineageChart } from "./schema";
+import { AlbumPick, Genre, isConfirmed, LineageChart } from "./schema";
 
 const client = new Anthropic();
 
@@ -56,7 +56,7 @@ export async function streamChart(artist: string, title: string, { emit, signal 
       if (signal.aborted) return;
       const checkStarted = Date.now();
       const check = await verifyAlbum(album.artist, album.title);
-      log(`verified #${id} in ${Date.now() - checkStarted}ms found=${check.found}`);
+      log(`verified #${id} in ${Date.now() - checkStarted}ms confirmed=${isConfirmed(check)}`);
       emit({ type: "verified", id, check });
     });
   };
